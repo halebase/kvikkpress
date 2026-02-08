@@ -137,3 +137,32 @@ document.querySelectorAll('pre').forEach(pre => {
   pre.appendChild(button);
 });
 
+// Copy for LLM — POST to get clipboard text from server, copy it
+const copyLlmBtn = document.getElementById('copy-llm-link');
+copyLlmBtn?.addEventListener('click', async () => {
+  try {
+    const res = await fetch(`/api/llm-copy?path=${encodeURIComponent(copyLlmBtn.dataset.path)}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to copy');
+    const { text } = await res.json();
+    await navigator.clipboard.writeText(text);
+    showToast('Copied for LLM');
+  } catch (err) {
+    showToast(err.message || 'Failed to copy');
+  }
+});
+
+function showToast(message) {
+  const existing = document.getElementById('toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'toast';
+  toast.className = 'fixed bottom-6 right-6 px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm rounded-lg shadow-lg z-50 transition-opacity duration-300';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+

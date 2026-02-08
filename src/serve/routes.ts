@@ -37,28 +37,29 @@ export function registerRoutes(
 ): void {
   app.use("*", logger());
 
-  // LLM token generation endpoint
-  if (llm) {
-    app.post("/api/llm-token", async (c) => {
-      if (llm.isAuthenticated && !await llm.isAuthenticated(c)) {
-        return c.json({ error: "Not authenticated" }, 401);
-      }
+  // Copy-for-LLM endpoint — returns clipboard text with signed token or llm=public
+  app.post("/api/llm-copy", async (c) => {
+    const origin = new URL(c.req.url).origin;
+    const path = c.req.query("path") || "/";
+    const page = content.pages[path];
+    const title = page?.meta?.title || "Documentation";
 
+    const isAuthed = llm?.isAuthenticated
+      ? await llm.isAuthenticated(c)
+      : false;
+
+    if (llm && isAuthed) {
       const { groupBits, entryBits } = resolveAllPermissions(llm);
       const token = await createLlmToken(llm, groupBits, entryBits);
-      const origin = new URL(c.req.url).origin;
-      const path = c.req.query("path") || "/";
-
       return c.json({
-        token,
-        expiresIn: `${llm.expiresInHours}h`,
-        usage: {
-          curl: `curl -s "${origin}${path}?llm=${token}"`,
-          hint: `Append ?llm=${token} to every link you follow on ${origin}`,
-        },
+        text: `${config.siteTitle} documentation for ${title}:\n${origin}${path}.md?llm=${token}\n\nUse curl -s for requests. Append ?llm=${token} to all .md URLs on ${origin}.`,
       });
+    }
+
+    return c.json({
+      text: `${config.siteTitle} documentation for ${title}:\n${origin}${path}.md?llm=public\n\nUse curl -s for requests. Append ?llm=public to all .md URLs on ${origin}.`,
     });
-  }
+  });
 
   // Dual-serve catch-all: .md → raw markdown, otherwise → HTML
   app.get("/*", async (c) => {
@@ -70,10 +71,10 @@ export function registerRoutes(
       const md = content.markdown[pathWithoutMd];
       if (!md) return c.text(`Not found: ${pathname}`, 404);
 
-      const nav = renderNavigation(content.contentIndex);
-
       // LLM auth for protected routes
       if (llm && isProtectedRoute(llm, pathname)) {
+        const nav = renderNavigation(content.contentIndex);
+
         // Primary auth (consumer callback, e.g. browser cookie session)
         if (llm.isAuthenticated && await llm.isAuthenticated(c)) {
           return serveMd(c, md + nav, "private, no-cache");
@@ -108,6 +109,11 @@ export function registerRoutes(
         });
       }
 
+      // Public route — filter nav to public pages only
+      const publicFilter = llm
+        ? (p: string) => !isProtectedRoute(llm, p)
+        : undefined;
+      const nav = renderNavigation(content.contentIndex, publicFilter);
       return serveMd(c, md + nav, "public, no-cache");
     }
 
@@ -163,25 +169,37 @@ function computeEtag(content: string): string {
 }
 
 /** Render content tree as markdown navigation with .md links for LLM traversal. */
-function renderNavigation(nodes: ContentNode[]): string {
+function renderNavigation(
+  nodes: ContentNode[],
+  filter?: (path: string) => boolean,
+): string {
   const lines: string[] = ["", "", "---", "", "## Pages"];
-  appendNodes(nodes, lines, 0);
+  appendNodes(nodes, lines, 0, filter);
   return lines.join("\n");
 }
 
-function appendNodes(nodes: ContentNode[], lines: string[], depth: number): void {
+function appendNodes(
+  nodes: ContentNode[],
+  lines: string[],
+  depth: number,
+  filter?: (path: string) => boolean,
+): void {
   const indent = "  ".repeat(depth);
   for (const node of nodes) {
     if (node.hidden) continue;
     if (node.isDir) {
       if (node.indexPath) {
-        lines.push(`${indent}- [${node.title}](${node.indexPath}.md)`);
+        if (!filter || filter(node.indexPath)) {
+          lines.push(`${indent}- [${node.title}](${node.indexPath}.md)`);
+        }
       } else {
         lines.push(`${indent}- ${node.title}`);
       }
-      appendNodes(node.children, lines, depth + 1);
+      appendNodes(node.children, lines, depth + 1, filter);
     } else {
-      lines.push(`${indent}- [${node.title}](${node.path}.md)`);
+      if (!filter || filter(node.path)) {
+        lines.push(`${indent}- [${node.title}](${node.path}.md)`);
+      }
     }
   }
 }

@@ -154,7 +154,7 @@ Request flow for protected `.md` routes:
 2. `?llm=` query param or `llm_s` cookie — verify HMAC signature and expiry
 3. Neither — return 401 markdown with usage instructions
 
-The "Copy for LLM" button in the UI calls `POST /api/llm-token` to generate a token for the current user's session. The `.md` responses themselves include navigation links and token instructions, so an LLM agent can traverse the site without additional guidance.
+The "Copy for LLM" button in the UI calls `POST /api/llm-copy` which returns ready-to-paste clipboard text with the page URL, token, and usage instructions. For authenticated users this includes a signed HMAC token; for unauthenticated users it uses `llm=public`. The `.md` responses themselves include navigation links and token instructions, so an LLM agent can traverse the site without additional guidance. Public `.md` responses filter the navigation to only show publicly accessible pages.
 
 Tokens encode permissions as positional bit flags — each group and entry maps to its array index. Don't reorder or remove entries from `groups` while unexpired tokens exist, or those tokens will grant access to the wrong routes. Append new entries instead.
 

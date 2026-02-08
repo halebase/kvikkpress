@@ -106,11 +106,15 @@ When `llm` config is provided, KvikkPress gates `.md` endpoints with stateless H
 1. `LlmConfig` (consumer-facing): `hmacKey` (CryptoKey — consumer imports it), `groups` (route prefix permissions), `isAuthenticated` callback, `expiresInHours` (default: 8)
 2. `initLlmRuntime()` validates config, stores CryptoKey → `LlmTokenRuntime` (internal, fully sync)
 3. `.md` request flow: `isAuthenticated` callback → `?llm=` param → `llm_s` cookie → 401 markdown
-4. `POST /api/llm-token` generates tokens (gated by `isAuthenticated`)
+4. `POST /api/llm-copy` — session-aware endpoint that returns `{ text }` with ready-to-paste clipboard content. If authenticated: generates a signed token. If not authenticated: returns `llm=public`. The server constructs the full text (title, curl command, instructions) — the client JS just POSTs and copies. **No client-side text construction.**
 
 Token format: 8-byte payload + 10-byte HMAC-80 = 18 bytes → 24 chars base64url. Permission model: 8 groups × 24 entries = 192 route prefixes in 4 bytes.
 
 All LLM plumbing lives in `src/llm-tokens.ts`. Routes integration is in `src/serve/routes.ts`. The consumer only passes config — KvikkPress handles auth, token generation, cookie fallback, and 401 responses internally.
+
+### Public Nav Filtering
+
+When `.md` is served on a public (non-protected) route, the `## Pages` navigation section is filtered to only include public pages — pages not covered by any `llm.groups` prefix. This prevents public LLM agents from seeing links to protected pages they can't access. Authenticated requests (session or valid token) get the full unfiltered navigation.
 
 ### MCP Server
 
@@ -142,7 +146,7 @@ Every content page is served at two URLs:
 - `/page` → rendered HTML (for browsers)
 - `/page.md` → raw markdown (for agents, crawlers, LLMs)
 
-`.md` responses include a `## Pages` navigation section at the bottom — the full content tree rendered as markdown links (e.g., `[Page Title](/path.md)`). This allows LLMs to discover and traverse the site without needing the HTML sidebar. Navigation is appended before the LLM footer (if token access).
+`.md` responses include a `## Pages` navigation section at the bottom — the content tree rendered as markdown links (e.g., `[Page Title](/path.md)`). This allows LLMs to discover and traverse the site without needing the HTML sidebar. Navigation is appended before the LLM footer (if token access). For public routes, the nav is filtered to only show public pages (see "Public Nav Filtering").
 
 ### HTTP Caching
 
@@ -158,6 +162,31 @@ Clean HTTP caching based on content hashes. No dev vs prod distinction — the h
 **`.md` pages** → `Cache-Control: public, no-cache` + `ETag` for open routes. `private, no-cache` + `ETag` for protected routes (session or token auth). Token-authenticated responses include a personalized footer, so `private` prevents CDN caching of per-user content.
 
 ETag computed via sync FNV-1a hash (`computeEtag()` in `routes.ts`) from the full response body. Fast enough for per-request computation — no precomputation needed.
+
+### Copy-for-LLM UI Pattern
+
+All templates use the same two-button pattern in the breadcrumb bar:
+1. **"Raw .md"** — `<a>` link to `{{ currentPath }}.md`
+2. **"Copy for LLM"** — `<button id="copy-llm-link" data-path="{{ currentPath }}">` with clipboard icon
+
+The button only needs `data-path`. No `data-title` or `data-site-title` — the server constructs the full clipboard text. The JS handler is minimal: POST to `/api/llm-copy?path=...`, copy the `text` field from the JSON response. No dropdowns, no split buttons, no client-side text construction.
+
+The clipboard text format (constructed server-side in `routes.ts`):
+```
+{siteTitle} documentation for {title}:
+{origin}{path}.md?llm={token}
+
+Use curl -s for requests. Append ?llm={token} to all .md URLs on {origin}.
+```
+
+For unauthenticated users, `{token}` is `public`.
+
+### Dev Ports
+
+Default ports in the 3600 range to avoid conflicts:
+- **3600** — `examples/start/`, `init.ts` scaffold, README examples
+- **3601** — `site/` (KvikkPress docs dogfooding)
+- **3602** — `examples/full/`
 
 ### createEngine() Is Internal
 
