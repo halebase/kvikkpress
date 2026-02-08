@@ -240,4 +240,6 @@ Returned by `dev()` and `createKvikkPress()`.
 
 *Named after eating one too many Kvikk Lunsjes while XC-skiing in Norway.*
 
+Built during the deployment of [halebase.com](https://halebase.com).
+
 Generated with some LLM assistance.
