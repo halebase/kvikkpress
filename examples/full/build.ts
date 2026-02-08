@@ -1,4 +1,4 @@
-import { build } from "../../build.ts";
+import { build } from "@halebase/kvikkpress/build";
 
 await build({
   content: "./content",

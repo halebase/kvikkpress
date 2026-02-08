@@ -4,9 +4,7 @@
 
 # KvikkPress
 
-A simple documentation server. Markdown files in, docs site out.
-
-Build-first: compiles markdown, templates, and assets into a single module at deploy time. Runtime serves from memory — no filesystem access, works on Deno, Cloudflare Workers, or any WinterTC-compatible platform.
+A documentation backend. Markdown in, docs site out — with a real backend when you need one.
 
 ```
 build time:   content/*.md + templates/ ──→ _build/site.ts
@@ -15,20 +13,30 @@ runtime:      site.ts ──→ fetch(Request) ──→ /page      HTML for bro
                                           ──→ /static/*  hashed assets
 ```
 
+Runs on Deno, should run on Cloudflare Workers, or any WinterTC-compatible platform.
+
+- **Pure markdown in/out** — HTML for browsers, raw `.md` for LLM agents. Fewer tokens, better generative results.
+- **Built at deploy** — CDN-optimized with immutable-cached assets, real backend available when you need it.
+- **Auth and gating** — sessions, scoped HMAC tokens for agents, protected pages.
+- **Syntax-highlighted code blocks** — Shiki, server-rendered, no client JS.
+- **Hackable** — it's a [Hono](https://hono.dev) app. Middleware, custom routes, whatever you need.
+
 ## Why
 
-You "just" want to render a folder of markdown as a docs site. Every page should also be available as clean `.md` — for agents, crawlers, LLMs. Static site generators get you there.
+You want to render a folder of markdown as a docs site. Every page should also be available as clean `.md` — for agents, crawlers, LLMs. Static site generators like VitePress, Docusaurus or MkDocs get you there.
 
-Then you need auth. Maybe session-gated pages, maybe scoped tokens for LLM agents. Now you need a server. Static generators can't do that, so you reach for Next.js or Astro with SSR, and suddenly you're deep in a framework — layouts, routing conventions, build plugins, hydration, the works. All you wanted was markdown with a session check.
+Then you need auth. Maybe session-gated pages or feature flags. You want LLM agents to access your gated docs. Now you need a server. Static generators can't do that, so you reach for Next.js or any other, and suddenly you're deep in a complex, slow framework that doesn't allow the gated security efficiently.
 
-KvikkPress stays in the simple lane. A folder of markdown files, a `fetch` handler, and whatever backend logic you wire up yourself. Auth, sessions, custom API routes — it's standard Hono middleware, not a framework-specific escape hatch.
+All you wanted was getting pure markdown with a session check live.
+
+KvikkPress stays in the simple lane. A folder of markdown files, a `fetch` handler, and whatever backend logic you wire up yourself.
 
 ## Quick start
 
 KvikkPress runs on [Deno](https://docs.deno.com/runtime/). Create a project and start the dev server:
 
 ```sh
-deno run -A --reload https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts my-docs
+deno run -A --reload=https://raw.githubusercontent.com/halebase/kvikkpress https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts my-docs
 cd my-docs
 deno task dev
 ```

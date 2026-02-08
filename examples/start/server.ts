@@ -1,4 +1,4 @@
-import { dev } from "../../dev.ts";
+import { dev } from "@halebase/kvikkpress/dev";
 // import { logger } from "./src/middleware.ts";
 
 // 1. Create the engine — builds content index, compiles CSS, starts file watcher.

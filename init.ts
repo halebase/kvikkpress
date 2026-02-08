@@ -3,15 +3,18 @@
 // KvikkPress project initializer.
 //
 // Usage:
-//   deno run -A --reload https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts my-docs
+//   deno run -A --reload=https://raw.githubusercontent.com/halebase/kvikkpress https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts my-docs
 //
-// Fetches the starter template from GitHub and writes standalone files
-// with correct jsr imports. Aborts if target files already exist.
+// Fetches the starter template from GitHub. Aborts if target files already exist.
 
 const REPO = "https://raw.githubusercontent.com/halebase/kvikkpress/main";
 
-// Files fetched as-is from the starter template on GitHub.
-const REMOTE_FILES = [
+// Every file in examples/start — fetched as-is.
+const FILES = [
+  "deno.json",
+  "server.ts",
+  "build.ts",
+  ".gitignore",
   "content/index.md",
   "src/middleware.ts",
   "static/main.js",
@@ -19,60 +22,6 @@ const REMOTE_FILES = [
   "templates/layout.html",
   "templates/main.css",
 ];
-
-// --- Standalone files (jsr imports, not monorepo-relative) ---
-
-const GENERATED: Record<string, string> = {
-  "deno.json": `{
-  "tasks": {
-    "dev": "deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env server.ts",
-    "build": "deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env build.ts"
-  }
-}
-`,
-  "server.ts": `import { dev } from "jsr:@halebase/kvikkpress/dev";
-
-// 1. Create the engine — builds content index, compiles CSS, starts file watcher.
-const engine = await dev({
-  content: "./content",
-  site: { title: "My Docs" },
-  templates: "./templates",
-  static: "./static",
-  css: {
-    input: "./templates/main.css",
-    output: "./_build/output.css",
-    tailwindConfig: "./tailwind.config.js",
-  },
-});
-
-// 2. Add your middleware before mount() — auth, logging, custom routes, etc.
-//    engine.app is a standard Hono app, so any Hono middleware works here.
-//    Put your custom code in src/ and import it (see src/middleware.ts).
-// import { logger } from "./src/middleware.ts";
-// engine.app.use("/*", logger);
-
-// 3. Mount KvikkPress routes, then serve.
-engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
-`,
-  "build.ts": `import { build } from "jsr:@halebase/kvikkpress/build";
-
-await build({
-  content: "./content",
-  templates: "./templates",
-  static: "./static",
-  css: {
-    input: "./templates/main.css",
-    output: "./_build/output.css",
-    tailwindConfig: "./tailwind.config.js",
-  },
-  outDir: "./_build",
-});
-`,
-  ".gitignore": `_build/
-node_modules/
-`,
-};
 
 // --- ANSI ---
 
@@ -92,7 +41,7 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-async function fetchRemote(path: string): Promise<string> {
+async function fetchFile(path: string): Promise<string> {
   const url = `${REPO}/examples/start/${path}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`fetch ${path}: ${res.status}`);
@@ -101,10 +50,10 @@ async function fetchRemote(path: string): Promise<string> {
 
 async function writeFile(base: string, path: string, content: string) {
   const full = base === "." ? path : `${base}/${path}`;
-  const dir = full.includes("/")
+  const parent = full.includes("/")
     ? full.substring(0, full.lastIndexOf("/"))
     : null;
-  if (dir) await Deno.mkdir(dir, { recursive: true });
+  if (parent) await Deno.mkdir(parent, { recursive: true });
   await Deno.writeTextFile(full, content);
   console.log(`  ${green("+")} ${path}`);
 }
@@ -131,16 +80,15 @@ if (!dir) {
   console.log();
   console.log(`  Usage:`);
   console.log(
-    `    deno run -A --reload ${dim("https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts")} my-docs`,
+    `    deno run -A --reload=https://raw.githubusercontent.com/halebase/kvikkpress ${dim("https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts")} my-docs`,
   );
   console.log();
   Deno.exit(1);
 }
 
 // Check for conflicting files.
-const allFiles = [...Object.keys(GENERATED), ...REMOTE_FILES];
 const conflicts: string[] = [];
-for (const file of allFiles) {
+for (const file of FILES) {
   const full = dir === "." ? file : `${dir}/${file}`;
   if (await fileExists(full)) conflicts.push(file);
 }
@@ -159,14 +107,8 @@ console.log();
 console.log(`  Fetching starter template...`);
 console.log();
 
-// Write generated files (standalone jsr imports).
-for (const [path, content] of Object.entries(GENERATED)) {
-  await writeFile(dir, path, content);
-}
-
-// Fetch and write remote files from GitHub.
-for (const path of REMOTE_FILES) {
-  const content = await fetchRemote(path);
+for (const path of FILES) {
+  const content = await fetchFile(path);
   await writeFile(dir, path, content);
 }
 

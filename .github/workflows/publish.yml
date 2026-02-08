@@ -27,7 +27,7 @@ jobs:
       - name: Inject version from tag
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          sed -i 's/"version": "0.0.0"/"version": "'$VERSION'"/' deno.json
+          sed -i 's/"version": "[^"]*"/"version": "'$VERSION'"/' deno.json
 
       - name: Publish to JSR
         run: deno publish --allow-dirty

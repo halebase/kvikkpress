@@ -1316,5 +1316,19 @@
     "zwitch@2.0.4": {
       "integrity": "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="
     }
+  },
+  "workspace": {
+    "members": {
+      "examples/full": {
+        "dependencies": [
+          "jsr:@halebase/kvikkpress@~0.1.2"
+        ]
+      },
+      "examples/start": {
+        "dependencies": [
+          "jsr:@halebase/kvikkpress@~0.1.2"
+        ]
+      }
+    }
   }
 }

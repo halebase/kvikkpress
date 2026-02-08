@@ -1,4 +1,4 @@
-import { dev } from "../../dev.ts";
+import { dev } from "@halebase/kvikkpress/dev";
 
 const engine = await dev({
   content: "./content",
