@@ -1,0 +1,9 @@
+groups:
+  kvikkpress:
+    services:
+      site:
+        command: deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env --watch server.ts
+        working_dir: ./site
+      example:
+        command: deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env --watch server.ts
+        working_dir: ./example

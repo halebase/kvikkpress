@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: oklch(0.97 0.01 55);
+  --color-primary-100: oklch(0.94 0.03 55);
+  --color-primary-200: oklch(0.87 0.06 55);
+  --color-primary-300: oklch(0.77 0.12 55);
+  --color-primary-400: oklch(0.67 0.16 55);
+  --color-primary-500: oklch(0.59 0.18 55);
+  --color-primary-600: oklch(0.51 0.17 55);
+  --color-primary-700: oklch(0.44 0.14 55);
+  --color-primary-800: oklch(0.38 0.11 55);
+  --color-primary-900: oklch(0.33 0.08 55);
+  --color-primary-950: oklch(0.20 0.05 55);
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    color-scheme: dark;
+  }
+}
+
+@layer components {
+  .content h1 {
+    @apply text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100 leading-tight tracking-tight;
+  }
+
+  .content h2 {
+    @apply text-2xl font-bold mt-12 mb-4 text-gray-900 dark:text-gray-100 scroll-mt-24 leading-tight;
+  }
+
+  .content h3 {
+    @apply text-xl font-semibold mt-8 mb-3 text-gray-900 dark:text-gray-100 scroll-mt-24 leading-snug;
+  }
+
+  .content h4 {
+    @apply text-lg font-semibold mt-6 mb-2 text-gray-900 dark:text-gray-100 scroll-mt-24;
+  }
+
+  .content .anchor-link {
+    @apply ml-2 text-gray-400 dark:text-gray-600 no-underline opacity-0 transition-opacity;
+  }
+
+  .content h1:hover .anchor-link,
+  .content h2:hover .anchor-link,
+  .content h3:hover .anchor-link,
+  .content h4:hover .anchor-link {
+    @apply opacity-100;
+  }
+
+  .content .anchor-link:hover {
+    @apply text-primary-600 dark:text-primary-400;
+  }
+
+  .content p {
+    @apply mb-4 text-gray-700 dark:text-gray-300 leading-relaxed;
+  }
+
+  .content pre {
+    @apply bg-[#1a1a1a] dark:bg-[#0a0a0a] p-6 rounded-lg overflow-x-auto my-6 border border-gray-300 dark:border-gray-900 text-sm text-gray-100;
+  }
+
+  .content figure[data-rehype-pretty-code-figure] {
+    @apply my-6;
+  }
+
+  .content figcaption[data-rehype-pretty-code-title] {
+    @apply bg-[#2a2a2a] dark:bg-[#111] text-gray-300 py-2 px-4 text-sm font-mono border border-gray-300 dark:border-gray-900 border-b-0 rounded-t-lg;
+  }
+
+  .content figcaption[data-rehype-pretty-code-title]::before {
+    content: "";
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    margin-right: 0.5em;
+    vertical-align: middle;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d1d5db' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'%3E%3C/path%3E%3Cpolyline points='14 2 14 8 20 8'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-size: contain;
+  }
+
+  .content figure[data-rehype-pretty-code-figure] pre {
+    @apply mt-0 rounded-t-none;
+  }
+
+  .content code {
+    @apply bg-gray-100 dark:bg-[#111] py-0.5 px-1.5 rounded text-[0.9em] font-mono text-gray-800 dark:text-gray-200;
+  }
+
+  .content pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  .content [data-highlighted-line] {
+    @apply bg-gray-700/50 dark:bg-gray-800/50 block;
+  }
+
+  .content a {
+    @apply text-primary-600 dark:text-primary-400 no-underline hover:underline transition-colors;
+  }
+
+  .content ul {
+    @apply mb-4 pl-6 list-disc marker:text-gray-400 dark:marker:text-gray-600;
+  }
+
+  .content ol {
+    @apply mb-4 pl-6 list-decimal marker:text-gray-400 dark:marker:text-gray-600;
+  }
+
+  .content li {
+    @apply mb-2 text-gray-700 dark:text-gray-300 leading-relaxed;
+  }
+
+  .content figure {
+    @apply my-6;
+  }
+
+  .content blockquote {
+    @apply border-l-4 border-primary-400 dark:border-primary-600 pl-4 my-6 text-gray-600 dark:text-gray-400 italic;
+  }
+
+  .content table {
+    @apply w-full my-6 border-collapse;
+  }
+
+  .content th {
+    @apply bg-gray-100 dark:bg-[#0a0a0a] font-semibold text-left p-3 border-b-2 border-gray-300 dark:border-gray-900;
+  }
+
+  .content td {
+    @apply p-3 border-b border-gray-200 dark:border-gray-900;
+  }
+
+  .content strong {
+    @apply font-semibold text-gray-900 dark:text-gray-100;
+  }
+
+  .content em {
+    @apply italic;
+  }
+}
