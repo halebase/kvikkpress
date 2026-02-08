@@ -1,0 +1,33 @@
+name: Publish to JSR
+
+on:
+  push:
+    tags:
+      - '[0-9]+.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run tests
+        run: deno test src/
+
+      - name: Inject version from tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          sed -i 's/"version": "0.0.0"/"version": "'$VERSION'"/' deno.json
+
+      - name: Publish to JSR
+        run: deno publish --allow-dirty

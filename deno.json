@@ -1,6 +1,7 @@
 {
   "name": "@halebase/kvikkpress",
-  "version": "0.2.0",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "exports": {
     ".": "./mod.ts",
     "./build": "./build.ts",
