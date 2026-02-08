@@ -12,6 +12,19 @@ const engine = await dev({
     output: "./_build/output.css",
     tailwindConfig: "./tailwind.config.js",
   },
+
+  // Uncomment to enable MCP server at POST /mcp.
+  // LLM clients can search and retrieve docs via standard MCP tool calls.
+  // mcp: {
+  //   name: "My Docs",
+  //   id: "my_project",
+  //   infoPage: true,
+  //   authenticate: (authorization, c /* c.req.header(), c.req.query() */) => {
+  //     if (!authorization) return null;
+  //     // Validate token here (HMAC, KV lookup, JWT, etc.)
+  //     return { canAccess: (path /* e.g. "/guides/auth" */) => true };
+  //   },
+  // },
 });
 
 // 2. Add your middleware before mount() — auth, logging, custom routes, etc.

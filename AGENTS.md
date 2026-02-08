@@ -18,6 +18,10 @@ kvikkpress/
 │   │   ├── render.ts       # Markdown → HTML (remark + rehype + shiki)
 │   │   ├── cache.ts        # ContentCache: in-memory page store with rebuild/update
 │   │   └── types.ts        # ContentNode, CachedPage, PageMeta, TocItem
+│   ├── mcp/                # MCP (Model Context Protocol) server
+│   │   ├── types.ts        # McpConfig, McpAuth interfaces
+│   │   ├── handler.ts      # JSON-RPC dispatch: initialize, tools/list, tools/call
+│   │   └── routes.ts       # Hono route registration: POST /mcp + optional GET /mcp info page
 │   ├── serve/              # HTTP layer
 │   │   ├── routes.ts       # Dual-serve routes: /page (HTML) + /page.md (raw markdown)
 │   │   ├── templates.ts    # Nunjucks: filesystem env (dev) and bundled env (prod)
@@ -108,6 +112,30 @@ Token format: 8-byte payload + 10-byte HMAC-80 = 18 bytes → 24 chars base64url
 
 All LLM plumbing lives in `src/llm-tokens.ts`. Routes integration is in `src/serve/routes.ts`. The consumer only passes config — KvikkPress handles auth, token generation, cookie fallback, and 401 responses internally.
 
+### MCP Server
+
+When `mcp` config is provided, KvikkPress exposes a JSON-RPC 2.0 endpoint at `POST /mcp` implementing the MCP Streamable HTTP transport. No MCP SDK — hand-rolled ~150 lines to avoid Node.js dependencies (WinterTC compatibility). No inverted index — case-insensitive regex over the existing in-memory `markdown` map is fast enough for doc sites.
+
+**Architecture:**
+- `src/mcp/types.ts` — `McpConfig` and `McpAuth` interfaces. All fields are **required** (no optional fields, no defaults)
+- `src/mcp/handler.ts` — Stateless JSON-RPC dispatch: `initialize`, `notifications/initialized`, `tools/list`, `tools/call`
+- `src/mcp/routes.ts` — Hono route registration + optional info page at `GET /mcp`
+
+**Two-level auth pattern:**
+1. `authenticate(authorization, c)` — called **once per request**. Validates the Bearer token. Returns `McpAuth | null`
+2. `McpAuth.canAccess(path)` — called **per page** during search to filter results by visibility
+
+This separation exists because one MCP search request scans multiple pages. The authenticate hook resolves the session, the returned `canAccess` closure captures session context and filters which pages appear in results.
+
+**Config design principles:**
+- `name` = display name for MCP clients (e.g. "My Project Docs"). `id` = tool name identifier, auto-normalized to snake_case → `query_docs_{id}`. Separate fields to avoid `query_docs_my_project_docs` when users name their project "My Project Docs"
+- `infoPage: boolean | string` — required, not optional. `true` = HTML info page at GET /mcp with client configs. String = same page + extra HTML. `false` = disabled
+- Parameter naming: use `authorization` not `token` — makes it obvious this is the Authorization header value
+
+**Search:** splits query into words, AND logic (all words must match), case-insensitive regex, returns top 5 hits as concatenated markdown with titles.
+
+**Route registration order:** MCP routes register inside `mount()` BEFORE `registerRoutes()` (the catch-all). This is handled internally.
+
 ### Dual-Serve
 
 Every content page is served at two URLs:
@@ -166,8 +194,8 @@ Examples are Deno workspace members (configured in root `deno.json` `"workspace"
 
 **Caret semver**: `^0.1.x` auto-resolves minor bumps within `>=0.1.x <0.2.0`. No need for CI to update example versions after each release.
 
-- **examples/start/** — minimal copy-paste starter. `server.ts` has commented-out middleware example (`src/middleware.ts`) that users uncomment to activate.
-- **examples/full/** — comprehensive reference showcasing every feature including commented-out LLM gated content config.
+- **examples/start/** — minimal copy-paste starter. `server.ts` has commented-out middleware example (`src/middleware.ts`) and MCP config that users uncomment to activate.
+- **examples/full/** — comprehensive reference showcasing every feature including commented-out LLM gated content and MCP config.
 
 ### Init Script
 

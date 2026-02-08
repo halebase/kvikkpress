@@ -41,6 +41,19 @@ const engine = await dev({
   //   ],
   //   isAuthenticated: (c) => !!c.req.header("cookie")?.includes("session="),
   // },
+
+  // Uncomment to enable MCP server at POST /mcp.
+  // LLM clients can search and retrieve docs via standard MCP tool calls.
+  // mcp: {
+  //   name: "Full Example Docs",
+  //   id: "full_example",
+  //   infoPage: true,
+  //   authenticate: (authorization, c /* c.req.header(), c.req.query() */) => {
+  //     if (!authorization) return null;
+  //     // Validate token here (HMAC, KV lookup, JWT, etc.)
+  //     return { canAccess: (path /* e.g. "/guides/auth" */) => true };
+  //   },
+  // },
 });
 
 engine.mount();

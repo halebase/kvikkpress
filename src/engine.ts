@@ -4,8 +4,10 @@ import { registerRoutes, type ContentData } from "./serve/routes.ts";
 import { createBundledEnv } from "./serve/templates.ts";
 import type { ContentNode, CachedPage } from "./content/types.ts";
 import { initLlmRuntime, type LlmConfig, type LlmTokenRuntime } from "./llm-tokens.ts";
+import { registerMcpRoutes } from "./mcp/routes.ts";
+import type { McpConfig } from "./mcp/types.ts";
 
-export type { LlmConfig };
+export type { LlmConfig, McpConfig };
 
 export interface KvikkPressConfig {
   /** Site metadata */
@@ -37,6 +39,9 @@ export interface KvikkPressConfig {
 
   /** LLM session token config. When provided, .md routes require auth via ?llm= token. */
   llm?: LlmConfig;
+
+  /** MCP server config. When provided, POST /mcp serves MCP tool calls. */
+  mcp?: McpConfig;
 }
 
 export interface KvikkPress {
@@ -68,7 +73,7 @@ export function createKvikkPress(config: KvikkPressConfig): KvikkPress {
 
   const llmRuntime = config.llm ? initLlmRuntime(config.llm) : undefined;
 
-  return createEngine(app, nunjucksEnv, config, llmRuntime);
+  return createEngine(app, nunjucksEnv, config, llmRuntime, config.mcp);
 }
 
 /**
@@ -88,6 +93,7 @@ export function createEngine(
     version?: string;
   },
   llmRuntime?: LlmTokenRuntime,
+  mcpConfig?: McpConfig,
 ): KvikkPress {
   let mounted = false;
 
@@ -102,6 +108,10 @@ export function createEngine(
 
     mount() {
       if (mounted) return;
+      // MCP routes must register before the catch-all in registerRoutes()
+      if (mcpConfig) {
+        registerMcpRoutes(app, content, mcpConfig);
+      }
       registerRoutes(app, nunjucksEnv, content, {
         siteTitle: config.site.title,
         templateGlobals: config.templateGlobals,

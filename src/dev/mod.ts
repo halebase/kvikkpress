@@ -3,7 +3,7 @@ import { serveStatic } from "jsr:@hono/hono@^4.10.4/deno";
 import { ContentCache } from "../content/cache.ts";
 import { buildFileHashes, hashFile } from "../serve/assets.ts";
 import { createFilesystemEnv } from "../serve/templates.ts";
-import { createEngine, type KvikkPress, type LlmConfig } from "../engine.ts";
+import { createEngine, type KvikkPress, type LlmConfig, type McpConfig } from "../engine.ts";
 import { initLlmRuntime } from "../llm-tokens.ts";
 import { startContentWatcher } from "./watcher.ts";
 import { buildCss, watchCss, type CssConfig } from "./css.ts";
@@ -42,6 +42,9 @@ export interface DevConfig {
 
   /** LLM session token config. When provided, .md routes require auth via ?llm= token. */
   llm?: LlmConfig;
+
+  /** MCP server config. When provided, POST /mcp serves MCP tool calls. */
+  mcp?: McpConfig;
 }
 
 /**
@@ -116,7 +119,7 @@ export async function dev(config: DevConfig): Promise<KvikkPress> {
     fileHashes,
     templateGlobals: config.templateGlobals,
     version: config.version,
-  }, llmRuntime);
+  }, llmRuntime, config.mcp);
 
   // 8. Start watchers
   startContentWatcher(config.content, cache);

@@ -20,6 +20,7 @@ Runs on Deno, should run on Cloudflare Workers, or any WinterTC-compatible platf
 - **Auth and gating** — sessions, scoped HMAC tokens for agents, protected pages.
 - **Syntax-highlighted code blocks** — Shiki, server-rendered, no client JS.
 - **Hackable** — it's a [Hono](https://hono.dev) app. Middleware, custom routes, whatever you need.
+- **MCP server** — expose docs as an authenticated [MCP](https://modelcontextprotocol.io) endpoint. LLM clients search and retrieve pages via standard tool calls.
 
 ## Why
 
@@ -92,6 +93,21 @@ const engine = await dev({
     output: "./_build/output.css",
     tailwindConfig: "./tailwind.config.js",
   },
+  mcp: {
+    name: "My Docs",
+    id: "my_project",
+    infoPage: true,
+    // Called once per request to validate the session
+    // c.req.header(), c.req.query(), c.req.url, etc.
+    authenticate: (authorization, c) => {
+      if (!authorization) return null;
+      return {
+        // Called per page to filter search results
+        // path, eg: "/guides/auth"
+        canAccess: (path) => true,
+      };
+    },
+  },
 });
 
 // Add middleware before mount() — auth, logging, custom routes, etc.
@@ -141,6 +157,49 @@ Request flow for protected `.md` routes:
 The "Copy for LLM" button in the UI calls `POST /api/llm-token` to generate a token for the current user's session. The `.md` responses themselves include navigation links and token instructions, so an LLM agent can traverse the site without additional guidance.
 
 Tokens encode permissions as positional bit flags — each group and entry maps to its array index. Don't reorder or remove entries from `groups` while unexpired tokens exist, or those tokens will grant access to the wrong routes. Append new entries instead.
+
+### MCP server
+
+Expose your documentation as an [MCP](https://modelcontextprotocol.io) server. LLM clients can search and retrieve pages via the standard Model Context Protocol over `POST /mcp`.
+
+```ts
+const engine = await dev({
+  ...config,
+  mcp: {
+    name: "My Project Docs",
+    id: "my_project",
+    infoPage: false,
+    authenticate: async (authorization, c /* c.req.header(), c.req.query() */) => {
+      if (!authorization) return null;
+      const user = await verifyToken(authorization); // your token validation
+      if (!user) return null;
+      return {
+        canAccess: (path) => user.allowedPrefixes.some((p) => path.startsWith(p)),
+      };
+    },
+  },
+});
+```
+
+The `authenticate` hook is required — there is no unauthenticated mode. It receives the Bearer token (or null) and the Hono request context. Return an `McpAuth` object with a `canAccess(path)` filter, or null to deny. You decide the token strategy: stateless HMAC, KV-backed sessions, JWT, etc.
+
+The server exposes a single tool, `query_docs_{id}` (e.g. `query_docs_my_project`), which searches the in-memory markdown by keyword and returns matching pages filtered through `canAccess()`. The tool name is derived from the `id` field to avoid collisions when a client connects to multiple MCP servers.
+
+**Example MCP client request:**
+
+```sh
+# Initialize
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+
+# Search docs
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query_docs_my_project","arguments":{"query":"authentication","topic":"/guides"}}}'
+```
 
 ### Build and deploy
 
@@ -195,6 +254,7 @@ When `css` is configured, KvikkPress manages Tailwind. `build()` runs `--minify`
 | `templateGlobals` | `Record<string, unknown>` | Optional. Extra variables for every template render |
 | `version` | `string` | Optional. Shown in templates. Default: `"dev"` |
 | `llm` | [`LlmConfig`](#llmconfig) | Optional. LLM session token config |
+| `mcp` | [`McpConfig`](#mcpconfig) | Optional. MCP server config. Enables `POST /mcp` |
 | `outDir` | `string` | Build output directory (`build()` only) |
 
 ### `createKvikkPress(config)`
@@ -210,6 +270,7 @@ When `css` is configured, KvikkPress manages Tailwind. `build()` runs `--minify`
 | `templateGlobals` | `Record<string, unknown>` | Optional. Extra variables for every template render |
 | `version` | `string` | Optional. Shown in templates. Default: `"dev"` |
 | `llm` | [`LlmConfig`](#llmconfig) | Optional. LLM session token config |
+| `mcp` | [`McpConfig`](#mcpconfig) | Optional. MCP server config. Enables `POST /mcp` |
 
 Typically you spread the build output: `createKvikkPress({ site: { title }, ...site })`.
 
@@ -223,6 +284,25 @@ Passed as `llm` in `dev()`, `build()`, and `createKvikkPress()`.
 | `groups` | `{ prefix: string }[][]` | Permission groups. Each group is an array of route prefixes. Max 8 groups (1 byte bitmask), max 24 entries per group (3 byte bitmask). Position-sensitive — don't reorder after issuing tokens |
 | `expiresInHours` | `number` | Optional. Token lifetime in hours. Default: `8` |
 | `isAuthenticated` | `(c: Context) => boolean \| Promise<boolean>` | Optional. Primary auth check (e.g. browser session). If true, serves without requiring LLM token |
+
+### `McpConfig`
+
+Passed as `mcp` in `dev()` and `createKvikkPress()`. Providing this config enables the `POST /mcp` route.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | **Required.** Display name shown to MCP clients (e.g. `"My Project Docs"`) |
+| `id` | `string` | **Required.** Short identifier for the tool name. Normalized to snake_case → `query_docs_{id}` |
+| `infoPage` | `boolean \| string` | **Required.** Serve an HTML info page at `GET /mcp` with client connection instructions. Pass a string to append extra HTML content |
+| `authenticate` | `(authorization: string \| null, c: Context) => McpAuth \| null \| Promise<McpAuth \| null>` | **Required.** Auth hook. Receives the Authorization Bearer value and Hono context. Return `McpAuth` to grant access, `null` to deny |
+
+### `McpAuth`
+
+Returned by the `authenticate` hook.
+
+| Field | Type | Description |
+|---|---|---|
+| `canAccess(path)` | `(path: string) => boolean` | Return true if this session can access the given page path |
 
 ### `KvikkPress`
 
