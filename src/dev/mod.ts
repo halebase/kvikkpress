@@ -31,7 +31,7 @@ export interface DevConfig {
     description?: string;
   };
 
-  /** Files to hash for cache busting (relative to static dir). Defaults to ["output.css", "main.js"]. */
+  /** Files to hash for cache busting (relative to static dir). Defaults to ["output.css", "kvikkpress.js"]. */
   hashFiles?: string[];
 
   /** Extra variables passed to every template render */
@@ -69,7 +69,7 @@ export async function dev(config: DevConfig): Promise<KvikkPress> {
   await cache.build();
 
   // 3. Hash static files
-  const hashFiles = config.hashFiles || ["main.js"];
+  const hashFiles = config.hashFiles || ["kvikkpress.js"];
   const fileHashes = await buildFileHashes(config.static, hashFiles);
 
   // Hash CSS from build output (lives in _build/, not static/)

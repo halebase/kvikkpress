@@ -155,7 +155,7 @@ Clean HTTP caching based on content hashes. No dev vs prod distinction — the h
 **Static assets** (dev only — production serves static files externally):
 - URLs with `?h=<hash>` → `Cache-Control: public, max-age=31536000, immutable`
 - URLs without hash → `Cache-Control: no-cache`
-- Templates reference assets as `/static/main.js?h={{ fileHashes['/static/main.js'] }}` — hash changes when content changes, URL changes, browser fetches fresh.
+- Templates reference assets as `/static/kvikkpress.js?h={{ fileHashes['/static/kvikkpress.js'] }}` — hash changes when content changes, URL changes, browser fetches fresh.
 
 **HTML pages** → `Cache-Control: public, no-cache` + `ETag` (FNV-1a hash of rendered output). CDNs cache and revalidate. 304 when content unchanged.
 
@@ -163,23 +163,11 @@ Clean HTTP caching based on content hashes. No dev vs prod distinction — the h
 
 ETag computed via sync FNV-1a hash (`computeEtag()` in `routes.ts`) from the full response body. Fast enough for per-request computation — no precomputation needed.
 
-### Copy-for-LLM UI Pattern
+### Templates & Client-Side JS
 
-All templates use the same two-button pattern in the breadcrumb bar:
-1. **"Raw .md"** — `<a>` link to `{{ currentPath }}.md`
-2. **"Copy for LLM"** — `<button id="copy-llm-link" data-path="{{ currentPath }}">` with clipboard icon
+See `templates/README.md` for the DOM contract, `kvikkpress.js` integration guide, Copy-for-LLM UI pattern, and template structure requirements.
 
-The button only needs `data-path`. No `data-title` or `data-site-title` — the server constructs the full clipboard text. The JS handler is minimal: POST to `/api/llm-copy?path=...`, copy the `text` field from the JSON response. No dropdowns, no split buttons, no client-side text construction.
-
-The clipboard text format (constructed server-side in `routes.ts`):
-```
-{siteTitle} documentation for {title}:
-{origin}{path}.md?llm={token}
-
-Use curl -s for requests. Append ?llm={token} to all .md URLs on {origin}.
-```
-
-For unauthenticated users, `{token}` is `public`.
+The clipboard text for Copy-for-LLM is constructed server-side in `routes.ts` via `POST /api/llm-copy`. No client-side text construction.
 
 ### Dev Ports
 

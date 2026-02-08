@@ -17,10 +17,11 @@ const FILES = [
   ".gitignore",
   "content/index.md",
   "src/middleware.ts",
-  "static/main.js",
+  "static/kvikkpress.js",
   "tailwind.config.js",
   "templates/layout.html",
   "templates/main.css",
+  "templates/README.md",
 ];
 
 // --- ANSI ---

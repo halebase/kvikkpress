@@ -31,7 +31,7 @@ Use `fileHashes` to append content hashes to asset URLs:
 
 ```html title="layout.html"
 <link href="/static/output.css?h={{ fileHashes['/static/output.css'] }}" rel="stylesheet">
-<script src="/static/main.js?h={{ fileHashes['/static/main.js'] }}"></script>
+<script src="/static/kvikkpress.js?h={{ fileHashes['/static/kvikkpress.js'] }}"></script>
 ```
 
 URLs with `?h=<hash>` get `Cache-Control: public, max-age=31536000, immutable`. Without the hash, `Cache-Control: no-cache`. The hash changes when content changes, so browsers fetch fresh automatically.

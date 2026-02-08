@@ -27,7 +27,7 @@ export interface BuildConfig {
   /** Markdown pipeline configuration */
   markdown?: MarkdownConfig;
 
-  /** Files to hash for cache busting (relative to static dir). Defaults to ["output.css", "main.js"]. */
+  /** Files to hash for cache busting (relative to static dir). Defaults to ["output.css", "kvikkpress.js"]. */
   hashFiles?: string[];
 
   /** Output directory for build artifacts. Defaults to "./_build". */
@@ -99,7 +99,7 @@ export async function build(config: BuildConfig): Promise<void> {
   console.log(`  Bundled ${Object.keys(templates).length} templates`);
 
   // 5. Asset hashing
-  const hashFiles = config.hashFiles || ["main.js"];
+  const hashFiles = config.hashFiles || ["kvikkpress.js"];
   const fileHashes = await buildFileHashes(config.static, hashFiles);
 
   // Hash CSS from build output (lives in _build/, not static/)

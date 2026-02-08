@@ -250,7 +250,7 @@ When `css` is configured, KvikkPress manages Tailwind. `build()` runs `--minify`
 | `site` | `{ title, description? }` | Site metadata |
 | `css` | `{ input, output, tailwindConfig }` | Optional. Tailwind CSS paths |
 | `markdown` | `{ remarkPlugins?, rehypePlugins?, shiki? }` | Optional. Markdown pipeline config |
-| `hashFiles` | `string[]` | Optional. Files to hash for cache busting. Default: `["output.css", "main.js"]` |
+| `hashFiles` | `string[]` | Optional. Files to hash for cache busting. Default: `["output.css", "kvikkpress.js"]` |
 | `templateGlobals` | `Record<string, unknown>` | Optional. Extra variables for every template render |
 | `version` | `string` | Optional. Shown in templates. Default: `"dev"` |
 | `llm` | [`LlmConfig`](#llmconfig) | Optional. LLM session token config |

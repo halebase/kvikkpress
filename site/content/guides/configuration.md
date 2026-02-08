@@ -32,7 +32,7 @@ const engine = await dev({
     shiki: { theme: "github-dark" },
   },
 
-  hashFiles: ["output.css", "main.js"],     // Files to hash for cache busting
+  hashFiles: ["output.css", "kvikkpress.js"],     // Files to hash for cache busting
   templateGlobals: { ... },                 // Extra variables in every template render
   version: "1.0.0",                         // Defaults to "dev"
   llm: { ... },                             // LLM session token config
@@ -57,7 +57,7 @@ const engine = await dev({
 |---|---|---|
 | `css` | `{ input, output, tailwindConfig }` | Tailwind CSS paths |
 | `markdown` | `{ remarkPlugins?, rehypePlugins?, shiki? }` | Markdown pipeline config |
-| `hashFiles` | `string[]` | Files to hash for cache busting. Default: `["output.css", "main.js"]` |
+| `hashFiles` | `string[]` | Files to hash for cache busting. Default: `["output.css", "kvikkpress.js"]` |
 | `templateGlobals` | `Record<string, unknown>` | Extra variables for every template render |
 | `version` | `string` | Shown in templates. Default: `"dev"` |
 | `llm` | `LlmConfig` | LLM session token config (see [LLM Tokens](/guides/llm-tokens)) |

@@ -1,3 +1,25 @@
+/**
+ * KvikkPress — client-side integration.
+ *
+ * Framework code. Upgrade by copying the latest version from KvikkPress.
+ *
+ * DOM contract — templates must provide:
+ *
+ *   #mobile-menu-btn        hamburger button, toggles sidebar on mobile
+ *   #mobile-overlay         dark overlay behind sidebar (starts hidden)
+ *   #sidebar                sidebar element, toggled via translate classes
+ *   #theme-toggle           button: cycles system → dark/light → system
+ *   #theme-icon-light       sun icon (starts hidden)
+ *   #theme-icon-dark        moon icon (starts hidden)
+ *   #copy-llm-link          "Copy for LLM" button; needs data-path="{{ currentPath }}"
+ *   .toc-link[data-id]      TOC links, highlighted on scroll
+ *   .content h2[id], h3[id] headings observed for TOC tracking
+ *   pre                     code blocks; copy button injected dynamically
+ *
+ *   localStorage key: themeMode ("light" | "dark" | absent = system)
+ *   Endpoint: POST /api/llm-copy?path=<path> → { text }
+ */
+
 const mobileMenuBtn = document.getElementById('mobile-menu-btn');
 const mobileOverlay = document.getElementById('mobile-overlay');
 const sidebar = document.getElementById('sidebar');

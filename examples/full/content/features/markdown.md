@@ -25,7 +25,7 @@ engine.mount();
 Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
 
-Hover over the code block to see the copy button (provided by `main.js`).
+Hover over the code block to see the copy button (provided by `kvikkpress.js`).
 
 ## Tables
 
