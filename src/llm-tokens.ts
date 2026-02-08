@@ -10,7 +10,7 @@ export interface LlmConfig {
   /** Permission groups — route prefixes mapped to bit positions. Max 8 groups, 24 entries each. */
   groups: { prefix: string }[][];
 
-  /** Token expiry in hours. Default: 24. */
+  /** Token expiry in hours. Default: 8. */
   expiresInHours?: number;
 
   /**
@@ -58,7 +58,7 @@ export function initLlmRuntime(config: LlmConfig): LlmTokenRuntime {
     epoch: Date.UTC(2025, 0, 1) / 1000,
     groups: config.groups,
     hmacKey: config.hmacKey,
-    expiresInHours: config.expiresInHours ?? 24,
+    expiresInHours: config.expiresInHours ?? 8,
     isAuthenticated: config.isAuthenticated,
   };
 }
@@ -178,7 +178,7 @@ export function llmFooter(token: string): string {
     "---",
     "",
     `> Append \`?llm=${token}\` to all .md URLs on this site. Use curl -s for requests.`,
-    "> Token expires in 24 hours. If you get a 401, ask the user for a new token.",
+    "> Token expires in a few hours. If you get a 401, ask the user for a new token.",
   ].join("\n");
 }
 

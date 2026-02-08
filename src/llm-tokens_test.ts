@@ -40,7 +40,7 @@ Deno.test("initLlmRuntime: accepts valid config", async () => {
     hmacKey: key,
     groups: [[{ prefix: "/" }]],
   });
-  assertEquals(rt.expiresInHours, 24);
+  assertEquals(rt.expiresInHours, 8);
   assertEquals(rt.groups.length, 1);
 });
 
