@@ -3,6 +3,9 @@ import type nunjucks from "npm:nunjucks@^3.2.4";
 import { registerRoutes, type ContentData } from "./serve/routes.ts";
 import { createBundledEnv } from "./serve/templates.ts";
 import type { ContentNode, CachedPage } from "./content/types.ts";
+import { initLlmRuntime, type LlmConfig, type LlmTokenRuntime } from "./llm-tokens.ts";
+
+export type { LlmConfig };
 
 export interface KvikkPressConfig {
   /** Site metadata */
@@ -31,6 +34,9 @@ export interface KvikkPressConfig {
 
   /** Version string shown in templates. Defaults to "dev". */
   version?: string;
+
+  /** LLM session token config. When provided, .md routes require auth via ?llm= token. */
+  llm?: LlmConfig;
 }
 
 export interface KvikkPress {
@@ -60,7 +66,9 @@ export function createKvikkPress(config: KvikkPressConfig): KvikkPress {
   const app = new Hono();
   const nunjucksEnv = createBundledEnv(config.templates);
 
-  return createEngine(app, nunjucksEnv, config);
+  const llmRuntime = config.llm ? initLlmRuntime(config.llm) : undefined;
+
+  return createEngine(app, nunjucksEnv, config, llmRuntime);
 }
 
 /**
@@ -79,6 +87,7 @@ export function createEngine(
     templateGlobals?: Record<string, unknown>;
     version?: string;
   },
+  llmRuntime?: LlmTokenRuntime,
 ): KvikkPress {
   let mounted = false;
 
@@ -98,7 +107,7 @@ export function createEngine(
         templateGlobals: config.templateGlobals,
         fileHashes: config.fileHashes,
         version: config.version || "dev",
-      });
+      }, llmRuntime);
       mounted = true;
     },
 

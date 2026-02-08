@@ -12,6 +12,7 @@ kvikkpress/
 ├── deno.json               # @halebase/kvikkpress — exports ".", "./build", "./dev"
 ├── src/                    # Library source
 │   ├── engine.ts           # Engine factory: createKvikkPress(), createEngine()
+│   ├── llm-tokens.ts       # Stateless HMAC-SHA256 LLM session tokens
 │   ├── content/            # Content pipeline
 │   │   ├── discovery.ts    # Walk content dir, build ContentNode tree
 │   │   ├── render.ts       # Markdown → HTML (remark + rehype + shiki)
@@ -39,15 +40,15 @@ kvikkpress/
 
 ```
 build()              Compile CSS + content + templates + hashes → _build/site.ts
-createKvikkPress()   Runtime engine from pre-built data. No filesystem, WinterTC-compatible.
-dev()                In-memory build + file watchers for content and CSS. Deno-only.
+createKvikkPress()   Sync. Runtime engine from pre-built data. No filesystem, WinterTC-compatible.
+dev()                Async (CSS build + content compilation). In-memory build + file watchers. Deno-only.
 ```
 
 ### Engine Lifecycle
 
-1. `createKvikkPress(config)` or `dev(config)` → returns `KvikkPress` engine
+1. `createKvikkPress(config)` (sync) or `await dev(config)` (async) → returns `KvikkPress` engine
 2. Consumer adds middleware/routes to `engine.app` (standard Hono app)
-3. `engine.mount()` registers KvikkPress catch-all routes
+3. `engine.mount()` registers KvikkPress catch-all routes (including LLM token endpoint if configured)
 4. `Deno.serve(engine.app.fetch)` or `export default { fetch: engine.fetch }`
 
 **mount() must be called AFTER consumer middleware.** KvikkPress routes are catch-all — anything registered after mount() will never match.
@@ -90,11 +91,41 @@ const fileHashes = await buildFileHashes(config.static, hashFiles);  // static d
 fileHashes["/static/output.css"] = await hashFile(config.css.output); // CSS artifact
 ```
 
+### LLM Session Tokens
+
+When `llm` config is provided, KvikkPress gates `.md` endpoints with stateless HMAC-signed tokens:
+
+1. `LlmConfig` (consumer-facing): `hmacKey` (CryptoKey — consumer imports it), `groups` (route prefix permissions), `isAuthenticated` callback
+2. `initLlmRuntime()` validates config, stores CryptoKey → `LlmTokenRuntime` (internal, fully sync)
+3. `.md` request flow: `isAuthenticated` callback → `?llm=` param → `llm_s` cookie → 401 markdown
+4. `POST /api/llm-token` generates tokens (gated by `isAuthenticated`)
+
+Token format: 8-byte payload + 10-byte HMAC-80 = 18 bytes → 24 chars base64url. Permission model: 8 groups × 24 entries = 192 route prefixes in 4 bytes.
+
+All LLM plumbing lives in `src/llm-tokens.ts`. Routes integration is in `src/serve/routes.ts`. The consumer only passes config — KvikkPress handles auth, token generation, cookie fallback, and 401 responses internally.
+
 ### Dual-Serve
 
 Every content page is served at two URLs:
 - `/page` → rendered HTML (for browsers)
 - `/page.md` → raw markdown (for agents, crawlers, LLMs)
+
+`.md` responses include a `## Pages` navigation section at the bottom — the full content tree rendered as markdown links (e.g., `[Page Title](/path.md)`). This allows LLMs to discover and traverse the site without needing the HTML sidebar. Navigation is appended before the LLM footer (if token access).
+
+### HTTP Caching
+
+Clean HTTP caching based on content hashes. No dev vs prod distinction — the hash mechanism handles cache busting naturally.
+
+**Static assets** (dev only — production serves static files externally):
+- URLs with `?h=<hash>` → `Cache-Control: public, max-age=31536000, immutable`
+- URLs without hash → `Cache-Control: no-cache`
+- Templates reference assets as `/static/main.js?h={{ fileHashes['/static/main.js'] }}` — hash changes when content changes, URL changes, browser fetches fresh.
+
+**HTML pages** → `Cache-Control: public, no-cache` + `ETag` (FNV-1a hash of rendered output). CDNs cache and revalidate. 304 when content unchanged.
+
+**`.md` pages** → `Cache-Control: public, no-cache` + `ETag` for open routes. `private, no-cache` + `ETag` for protected routes (session or token auth). Token-authenticated responses include a personalized footer, so `private` prevents CDN caching of per-user content.
+
+ETag computed via sync FNV-1a hash (`computeEtag()` in `routes.ts`) from the full response body. Fast enough for per-request computation — no precomputation needed.
 
 ### createEngine() Is Internal
 

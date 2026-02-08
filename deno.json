@@ -5,5 +5,8 @@
     ".": "./mod.ts",
     "./build": "./build.ts",
     "./dev": "./dev.ts"
+  },
+  "tasks": {
+    "test": "deno test src/"
   }
 }

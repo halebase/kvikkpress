@@ -13,81 +13,47 @@ runtime:      site.ts ──→ fetch(Request) ──→ /page      HTML for bro
 
 ## Why
 
-What happens when you "just" need to render markdown docs conditionally based on session? Static site generators can't do server-side auth, and every page still needs to be crawlable as clean markdown. KvikkPress needs a folder of markdown files and a fetch handler.
+You "just" want to render a folder of markdown as a docs site. Every page should also be available as clean `.md` — for agents, crawlers, LLMs. Static site generators get you there.
 
-When you need backend logic — auth, sessions, custom API routes — it's standard Hono middleware. Not a framework-specific escape hatch.
+Then you need auth. Maybe session-gated pages, maybe scoped tokens for LLM agents. Now you need a server. Static generators can't do that, so you reach for Next.js or Astro with SSR, and suddenly you're deep in a framework — layouts, routing conventions, build plugins, hydration, the works. All you wanted was markdown with a session check.
+
+KvikkPress stays in the simple lane. A folder of markdown files, a `fetch` handler, and whatever backend logic you wire up yourself. Auth, sessions, custom API routes — it's standard Hono middleware, not a framework-specific escape hatch.
 
 ## Quick start
 
-KvikkPress runs on [Deno](https://docs.deno.com/runtime/).
+KvikkPress runs on [Deno](https://docs.deno.com/runtime/). Copy the starter, add content, run:
 
-**1. Build** — compile content + CSS + templates into a module:
-
-```ts title="build.ts"
-import { build } from "@halebase/kvikkpress/build";
-
-await build({
-  content: "./content",
-  templates: "./templates",
-  static: "./static",
-  css: {
-    input: "./templates/main.css",
-    output: "./_build/output.css",
-    tailwindConfig: "./tailwind.config.js",
-  },
-  outDir: "./_build",
-});
+```sh
+cp -r examples/start my-docs
+cd my-docs
+deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env server.ts
 ```
 
-**2. Serve** — create a runtime engine from the build output:
+Open `http://localhost:3000`. Edit `content/index.md`, refresh.
 
-```ts title="server.ts"
-import { createKvikkPress } from "@halebase/kvikkpress";
-import * as site from "./_build/site.ts";
+## What it does
 
-const engine = createKvikkPress({
-  site: { title: "My Docs" },
-  ...site,
-});
+Every `.md` file in `content/` becomes two URLs:
 
-engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
+- `/page` — rendered HTML for browsers
+- `/page.md` — raw markdown for agents, with site navigation links for traversal
+
+Folders become sidebar sections. Frontmatter controls title and order:
+
+```yaml
+---
+title: "Page Title"
+order: 1
+---
 ```
 
-**3. Dev** — live reload without a build step:
+Markdown is rendered to HTML at build time — GFM tables, syntax-highlighted code blocks (Shiki), auto-linked headings, table of contents. No client-side JS needed for markup. The runtime serves pre-rendered HTML from memory.
 
-```ts title="dev.ts"
-import { dev } from "@halebase/kvikkpress/dev";
+`engine.app` is a standard [Hono](https://hono.dev) app — add middleware, auth, custom routes before calling `engine.mount()`.
 
-const engine = await dev({
-  content: "./content",
-  site: { title: "My Docs" },
-  templates: "./templates",
-  static: "./static",
-  css: {
-    input: "./templates/main.css",
-    output: "./_build/output.css",
-    tailwindConfig: "./tailwind.config.js",
-  },
-});
+## Reference
 
-engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
-```
-
-Put markdown files in `content/`, a `layout.html` template in `templates/`, done.
-
-## How it works
-
-Content is compiled at build time into a TypeScript module (`_build/site.ts`). At runtime, the engine serves everything from memory — no filesystem access needed.
-
-```
-build()              Compile CSS + content + templates → _build/site.ts. Run at deploy time.
-createKvikkPress()   Create runtime engine from pre-built data. Filesystem-free.
-dev()                Build in-memory + file watchers for content and CSS. Dev only.
-```
-
-## Content
+### Content structure
 
 ```
 content/
@@ -101,137 +67,107 @@ content/
     └── endpoints.md            → /api/endpoints
 ```
 
-Folders become sidebar sections. Files become pages. Frontmatter controls title, order, and visibility:
-
-```yaml
----
-title: "Page Title"
-order: 1
-visibility: admin, auth
----
-```
-
-Kebab-case folder names auto-convert to title case in the sidebar.
-
-## Backend logic
-
-KvikkPress exposes a Hono app. Add middleware and routes before calling `mount()`:
+### Backend logic
 
 ```ts
 const engine = createKvikkPress({ ... });
 
-// Auth: protect HTML, leave markdown open for agents
 engine.app.use("/*", async (c, next) => {
-  if (c.req.path.endsWith(".md")) return next();
   if (!isAuthenticated(c)) return c.redirect("/login");
   return next();
 });
 
-// Custom routes alongside docs
 engine.app.get("/api/search", searchHandler);
 
 engine.mount();
 Deno.serve({ port: 3000 }, engine.app.fetch);
 ```
 
-## Configuration
+### LLM session tokens
 
-**Build config** (passed to `build()` and `dev()`):
-
-```ts
-{
-  content: "./content",           // Markdown content directory
-  templates: "./templates",       // Nunjucks templates. Must have layout.html.
-  static: "./static",             // Static assets, served at /static/*
-  css: {                          // Optional. Tailwind CSS build.
-    input: "./templates/main.css",
-    output: "./_build/output.css",
-    tailwindConfig: "./tailwind.config.js",
-  },
-  markdown: {                     // All optional
-    remarkPlugins: [],
-    rehypePlugins: [],
-    shiki: { theme: "github-dark" },
-  },
-  outDir: "./_build",             // Build output directory (build() only)
-}
-```
-
-**Runtime config** (passed to `createKvikkPress()`):
+Gate `.md` endpoints with stateless HMAC-signed tokens. Authenticated users generate compact URL tokens (`?llm=...`) for LLM agents.
 
 ```ts
-{
-  site: { title: "My Docs", description: "Optional" },
-  contentIndex,                   // From build output
-  pages,                          // From build output
-  markdown,                       // From build output
-  templates,                      // From build output
-  fileHashes,                     // From build output
-  templateGlobals: { ... },       // Extra variables in every template render
-  version: "1.0.0",              // Defaults to "dev"
-}
+const hmacKey = await crypto.subtle.importKey(
+  "raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"],
+);
+
+const engine = createKvikkPress({
+  ...site,
+  llm: {
+    hmacKey,
+    groups: [[{ prefix: "/" }]],
+    isAuthenticated: (c) => checkSession(c),
+  },
+});
 ```
 
-In practice, spread the build output: `createKvikkPress({ site: {...}, ...site })`.
+When configured: protected `.md` routes check `isAuthenticated` first, then `?llm=` token, then `llm_s` cookie fallback, then 401. `POST /api/llm-token` generates tokens.
 
-## Template data
+### Build & deploy
 
-`layout.html` receives:
+```ts title="build.ts"
+import { build } from "@halebase/kvikkpress/build";
 
-| Variable | Type | Description |
-|---|---|---|
-| `title` | `string` | Page title from frontmatter |
-| `content` | `string` | Rendered HTML |
-| `toc` | `TocItem[]` | Table of contents (h2/h3) |
-| `currentPath` | `string` | Current URL path |
-| `meta` | `PageMeta` | All frontmatter data |
-| `siteTitle` | `string` | From config |
-| `contentTree` | `ContentNode[]` | Full hierarchy for sidebar |
-| `fileHashes` | `Record<string, string>` | Cache-busting hashes |
-| `year` | `number` | Current year |
-| `version` | `string` | From config |
-| `...templateGlobals` | | Your custom variables |
-
-## Markdown
-
-Default pipeline: remark-gfm, remark-frontmatter, rehype-slug, rehype-autolink-headings, rehype-pretty-code (shiki), rehype-stringify.
-
-Extend with `remarkPlugins` and `rehypePlugins` — appended to the defaults.
-
-## CSS
-
-When `css` is configured, KvikkPress manages Tailwind. CSS compiles to `_build/output.css` alongside other artifacts. The dev server maps it to `/static/output.css` automatically.
-
-- `build()` runs `@tailwindcss/cli --minify`
-- `dev()` runs `@tailwindcss/cli --watch`
-
-```css
-@import "tailwindcss";
-
-@theme {
-  --color-primary-500: oklch(0.59 0.23 332);
-}
+await build({
+  content: "./content",
+  templates: "./templates",
+  static: "./static",
+  css: { input: "./templates/main.css", output: "./_build/output.css", tailwindConfig: "./tailwind.config.js" },
+  outDir: "./_build",
+});
 ```
 
-## Docker
+```ts title="server.ts"
+import { createKvikkPress } from "@halebase/kvikkpress";
+import * as site from "./_build/site.ts";
 
-```dockerfile
-RUN deno run ... build.ts          # Compile CSS + content + templates (build time)
-CMD ["deno", "run", ... "server.ts"]  # Serve from memory (runtime)
+const engine = createKvikkPress({ site: { title: "My Docs" }, ...site });
+engine.mount();
+Deno.serve({ port: 3000 }, engine.app.fetch);
 ```
 
-`build()` compiles everything at image build time. The runtime imports `_build/site.ts` and serves from memory.
+### Configuration
 
-## .gitignore
+**Build config** — `build()` and `dev()`:
 
-Add these generated files to `.gitignore`:
+| Option | Description |
+|---|---|
+| `content` | Markdown content directory |
+| `templates` | Nunjucks templates (must have `layout.html`) |
+| `static` | Static assets, served at `/static/*` |
+| `css` | Optional. Tailwind CSS: `input`, `output`, `tailwindConfig` |
+| `markdown` | Optional. `remarkPlugins`, `rehypePlugins`, `shiki` theme |
+| `outDir` | Build output directory (`build()` only) |
+
+**Runtime config** — `createKvikkPress()`:
+
+| Option | Description |
+|---|---|
+| `site` | `{ title, description? }` |
+| `contentIndex`, `pages`, `markdown`, `templates`, `fileHashes` | From build output (spread `...site`) |
+| `templateGlobals` | Extra variables for every template render |
+| `version` | Shown in templates. Defaults to `"dev"` |
+| `llm` | Optional. `{ hmacKey, groups, isAuthenticated? }` |
+
+### Template data
+
+`layout.html` receives: `title`, `content`, `toc`, `currentPath`, `meta`, `siteTitle`, `contentTree`, `fileHashes`, `year`, `version`, and your `templateGlobals`.
+
+### CSS
+
+When `css` is configured, KvikkPress manages Tailwind. `build()` runs `--minify`, `dev()` runs `--watch`.
+
+### .gitignore
 
 ```
 _build/
 node_modules/
 ```
 
-`_build/` contains all build artifacts: `site.ts` (compiled content/templates/hashes) and `output.css` (compiled Tailwind CSS). `node_modules/` is created by Deno's `--node-modules-dir` flag.
+## TODO
+
+- **Islands for dynamic code blocks** — a lightweight islands-like architecture to allow server-side rendering of user-specific code blocks in markdown output. Think personalized install commands, session-scoped API keys, or per-user examples — generated server-side per request, injected into the otherwise static page.
 
 ---
 

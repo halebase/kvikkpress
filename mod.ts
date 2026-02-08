@@ -1,5 +1,5 @@
 export { createKvikkPress } from "./src/engine.ts";
-export type { KvikkPress, KvikkPressConfig } from "./src/engine.ts";
+export type { KvikkPress, KvikkPressConfig, LlmConfig } from "./src/engine.ts";
 export type { MarkdownConfig } from "./src/content/render.ts";
 export type { CssConfig } from "./src/dev/css.ts";
 export type {

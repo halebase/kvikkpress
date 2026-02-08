@@ -3,7 +3,8 @@ import { serveStatic } from "jsr:@hono/hono@^4.10.4/deno";
 import { ContentCache } from "../content/cache.ts";
 import { buildFileHashes, hashFile } from "../serve/assets.ts";
 import { createFilesystemEnv } from "../serve/templates.ts";
-import { createEngine, type KvikkPress } from "../engine.ts";
+import { createEngine, type KvikkPress, type LlmConfig } from "../engine.ts";
+import { initLlmRuntime } from "../llm-tokens.ts";
 import { startContentWatcher } from "./watcher.ts";
 import { buildCss, watchCss, type CssConfig } from "./css.ts";
 import type { MarkdownConfig } from "../content/render.ts";
@@ -38,6 +39,9 @@ export interface DevConfig {
 
   /** Version string shown in templates. Defaults to "dev". */
   version?: string;
+
+  /** LLM session token config. When provided, .md routes require auth via ?llm= token. */
+  llm?: LlmConfig;
 }
 
 /**
@@ -76,34 +80,34 @@ export async function dev(config: DevConfig): Promise<KvikkPress> {
   // 5. Create Hono app with static file serving for dev
   const app = new Hono();
 
+  // Static asset cache headers — hash-busted URLs (?h=) get immutable long cache
+  app.use("/static/*", async (c, next) => {
+    await next();
+    if (c.req.query("h")) {
+      c.res.headers.set("cache-control", "public, max-age=31536000, immutable");
+    } else {
+      c.res.headers.set("cache-control", "no-cache");
+    }
+  });
+
   // Serve CSS from _build/ (generated artifact, not a source file)
   if (config.css) {
     const cssOutputPath = config.css.output;
     app.get("/static/output.css", async (c) => {
       const content = await Deno.readFile(cssOutputPath);
-      c.res.headers.set("cache-control", "no-store, no-cache, must-revalidate");
       return c.body(content, 200, { "content-type": "text/css; charset=utf-8" });
     });
   }
-
-  app.use("/static/*.js", async (c, next) => {
-    await next();
-    c.res.headers.set("cache-control", "no-store, no-cache, must-revalidate");
-  });
-
-  app.use("/static/*", async (c, next) => {
-    await next();
-    if (c.res.headers.get("content-type")?.startsWith("image/")) {
-      c.res.headers.set("cache-control", "public, max-age=14400");
-    }
-  });
 
   app.use(
     "/static/*",
     serveStatic({ root: "./", rewriteRequestPath: (path) => path }),
   );
 
-  // 6. Create engine with mutable content data
+  // 6. Init LLM runtime if configured
+  const llmRuntime = config.llm ? initLlmRuntime(config.llm) : undefined;
+
+  // 7. Create engine with mutable content data
   const engine = createEngine(app, nunjucksEnv, {
     site: config.site,
     contentIndex: cache.contentIndex,
@@ -112,9 +116,9 @@ export async function dev(config: DevConfig): Promise<KvikkPress> {
     fileHashes,
     templateGlobals: config.templateGlobals,
     version: config.version,
-  });
+  }, llmRuntime);
 
-  // 7. Start watchers
+  // 8. Start watchers
   startContentWatcher(config.content, cache);
   if (config.css) {
     watchCss(config.css);
