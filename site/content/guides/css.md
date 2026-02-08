@@ -5,10 +5,10 @@ order: 6
 
 # CSS
 
-When `theme.css` is configured, KvikkPress manages Tailwind:
+When `css` is configured, KvikkPress manages Tailwind:
 
 - `build()` runs `@tailwindcss/cli --minify`
-- `startDev()` runs `@tailwindcss/cli --watch`
+- `dev()` runs `@tailwindcss/cli --watch`
 
 ## Setup
 
@@ -20,7 +20,7 @@ When `theme.css` is configured, KvikkPress manages Tailwind:
 }
 ```
 
-No separate build step needed. KvikkPress handles compilation at startup (`build()`) and file watching in dev mode (`startDev()`).
+No separate build step needed. KvikkPress handles compilation at startup and file watching in dev mode.
 
 ## Markdown pipeline
 

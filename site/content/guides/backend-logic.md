@@ -5,32 +5,40 @@ order: 3
 
 # Backend Logic
 
-KvikkPress exposes a Hono app. Add middleware and routes before calling `start()`.
+`engine.app` is a standard [Hono](https://hono.dev) app. Add middleware and routes before calling `engine.mount()`.
 
 ## Auth middleware
 
 ```ts title="server.ts"
-const docs = createKvikkPress({ ... });
+import { dev } from "@halebase/kvikkpress/dev";
+
+const engine = await dev({ ... });
 
 // Protect HTML, leave markdown open for agents
-docs.app.use("/*", async (c, next) => {
+engine.app.use("/*", async (c, next) => {
   if (c.req.path.endsWith(".md")) return next();
   if (!isAuthenticated(c)) return c.redirect("/login");
   return next();
 });
 
 // Custom routes alongside docs
-docs.app.get("/api/search", searchHandler);
+engine.app.get("/api/search", searchHandler);
 
-await docs.start();
-Deno.serve({ port: 3000 }, docs.app.fetch);
+engine.mount();
+Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
 
-## Dual-serve
+## Custom routes
 
-Every page is available in two formats at different URLs:
+Add routes alongside docs:
 
-- `/page` — rendered HTML for browsers
-- `/page.md` — raw markdown for agents, LLMs, and scripts
+```ts title="custom routes"
+engine.app.get("/api/search", searchHandler);
+engine.app.get("/health", (c) => c.json({ ok: true }));
+```
 
-This lets you protect HTML with auth while keeping markdown open for automated tools.
+## mount() order
+
+`engine.mount()` registers KvikkPress's catch-all route (`GET /*`). Any middleware or routes added after `mount()` won't be reached for paths that KvikkPress handles.
+
+Pattern: create engine → add middleware → add custom routes → `mount()`.

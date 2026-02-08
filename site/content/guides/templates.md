@@ -34,6 +34,8 @@ Use `fileHashes` to append content hashes to asset URLs:
 <script src="/static/main.js?h={{ fileHashes['/static/main.js'] }}"></script>
 ```
 
+URLs with `?h=<hash>` get `Cache-Control: public, max-age=31536000, immutable`. Without the hash, `Cache-Control: no-cache`. The hash changes when content changes, so browsers fetch fresh automatically.
+
 ## Sidebar rendering
 
 The `contentTree` variable contains the full page hierarchy. Iterate recursively to build sidebar navigation:

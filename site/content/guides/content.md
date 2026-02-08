@@ -27,13 +27,20 @@ Folders become sidebar sections. Files become pages.
 ---
 title: "Page Title"
 order: 1
-visibility: admin, auth
 ---
 ```
 
 - `title` — required, shown in sidebar and page header
 - `order` — sort position within section
-- `visibility` — comma-separated roles (optional, for filtering)
+
+## Dual-serve
+
+Every page is available at two URLs:
+
+- `/page` — rendered HTML for browsers
+- `/page.md` — raw markdown for agents, LLMs, and scripts
+
+`.md` responses include a navigation section at the bottom — the full content tree rendered as markdown links. This allows LLMs to discover and traverse the site without the HTML sidebar.
 
 ## Folder naming
 

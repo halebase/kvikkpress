@@ -34,4 +34,4 @@ const engine = await dev({
 
 // 3. Mount KvikkPress routes, then serve.
 engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
+Deno.serve({ port: 3600 }, engine.app.fetch);

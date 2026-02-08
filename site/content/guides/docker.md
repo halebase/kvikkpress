@@ -1,16 +1,38 @@
 ---
 title: "Docker"
-order: 7
+order: 9
 ---
 
 # Docker
 
-```dockerfile title="Dockerfile"
-RUN deno run ... build.ts          # CSS compilation (build time)
-CMD ["deno", "run", ... "server.ts"]  # Content rendering (startup)
+## Build and deploy
+
+`build()` pre-renders all content to a single `site.ts` module. In production, import it and serve:
+
+```ts title="build.ts"
+import { build } from "@halebase/kvikkpress/build";
+
+await build({
+  content: "./content",
+  templates: "./templates",
+  static: "./static",
+  css: {
+    input: "./templates/main.css",
+    output: "./_build/output.css",
+    tailwindConfig: "./tailwind.config.js",
+  },
+  outDir: "./_build",
+});
 ```
 
-`build()` and `start()` are separate so assets compile once at image build time.
+```ts title="server.ts (production)"
+import { createKvikkPress } from "@halebase/kvikkpress";
+import * as site from "./_build/site.ts";
+
+const engine = createKvikkPress({ site: { title: "My Docs" }, ...site });
+engine.mount();
+Deno.serve({ port: 3600 }, engine.app.fetch);
+```
 
 ## Example Dockerfile
 
@@ -18,15 +40,15 @@ CMD ["deno", "run", ... "server.ts"]  # Content rendering (startup)
 FROM denoland/deno:2.5.4
 WORKDIR /app
 COPY . .
-RUN deno cache --node-modules-dir server.ts
-RUN deno run --node-modules-dir --allow-read --allow-write --allow-run --allow-env build.ts
-CMD ["deno", "run", "--node-modules-dir", "--allow-net", "--allow-read", "--allow-env", "server.ts"]
+RUN deno cache server.ts
+RUN deno run -A build.ts
+CMD ["deno", "run", "--allow-net", "--allow-read", "--allow-env", "server.ts"]
 ```
 
-## Build vs Start
+## Build vs Runtime
 
-| Phase | Method | When | What |
+| Phase | Function | When | What |
 |---|---|---|---|
-| Build | `engine.build()` | Docker image build | Compile CSS |
-| Start | `engine.start()` | Container startup | Pre-render content, hash assets, register routes |
-| Dev | `engine.startDev()` | Local dev | Both + file watchers |
+| Build | `build()` | Docker image build | Compile CSS + content + templates → `_build/site.ts` |
+| Runtime | `createKvikkPress()` | Container startup | Sync engine from pre-built data, no filesystem |
+| Dev | `dev()` | Local development | In-memory build + file watchers + CSS watch |

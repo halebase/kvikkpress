@@ -22,7 +22,7 @@ const engine = await dev({
 });
 
 engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
+Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
 
 Hover over the code block to see the copy button (provided by `main.js`).

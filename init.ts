@@ -118,5 +118,5 @@ console.log();
 console.log(`    cd ${dir}`);
 console.log(`    deno task dev`);
 console.log();
-console.log(`  Then open ${bold("http://localhost:3000")}`);
+console.log(`  Then open ${bold("http://localhost:3600")}`);
 console.log();

@@ -13,7 +13,7 @@ This is a minimal KvikkPress example. Edit `content/index.md` to get started.
 deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env server.ts
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3600](http://localhost:3600).
 
 ## Adding pages
 

@@ -5,40 +5,54 @@ order: 1
 
 # Quick Start
 
-KvikkPress runs on [Deno](https://docs.deno.com/runtime/).
+KvikkPress runs on [Deno](https://docs.deno.com/runtime/). Create a project and start the dev server:
 
-## Setup
-
-```ts title="server.ts"
-import { createKvikkPress } from "kvikkpress";
-
-const docs = createKvikkPress({
-  content: "./content",
-  site: { title: "My Docs" },
-  theme: {
-    templates: "./templates",
-    static: "./static",
-  },
-});
-
-await docs.start();
-Deno.serve({ port: 3000 }, docs.app.fetch);
+```sh title="terminal"
+deno run -A --reload=https://raw.githubusercontent.com/halebase/kvikkpress https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts my-docs
+cd my-docs
+deno task dev
 ```
 
-Put markdown files in `content/`, a `layout.html` template in `templates/`, done.
+Open `http://localhost:3600`. Edit `content/index.md`, refresh.
 
 ## How it works
 
-All pages are pre-rendered at startup into an in-memory cache. Requests hit the cache, not the filesystem. This gives you static-site throughput with a running server behind it.
+Every `.md` file in `content/` becomes two URLs:
 
-```text title="lifecycle"
-build()      Compile CSS. Run once at Docker build time.
-start()      Pre-render content, hash assets, register routes. Run at server startup.
-startDev()   build() + start() + file watchers for content and CSS.
+- `/page` — rendered HTML for browsers
+- `/page.md` — raw markdown for agents, with navigation links for traversal
+
+Content is rendered at build time — GFM tables, syntax-highlighted code blocks (Shiki), auto-linked headings, table of contents. No client-side JS for markup. The runtime serves pre-rendered HTML from memory.
+
+## Three entry points
+
+```text title="entry points"
+dev(config)              Async. In-memory build + file watchers + CSS watch. Deno-only.
+build(config)            Compile CSS + content + templates + hashes → _build/site.ts
+createKvikkPress(config) Sync. Runtime engine from pre-built data. No filesystem, WinterTC-compatible.
 ```
 
-## Running
+`dev()` is for local development. `build()` + `createKvikkPress()` is for production.
 
-```sh title="terminal"
-deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env server.ts
+## Dev server
+
+```ts title="server.ts"
+import { dev } from "@halebase/kvikkpress/dev";
+
+const engine = await dev({
+  content: "./content",
+  site: { title: "My Docs" },
+  templates: "./templates",
+  static: "./static",
+  css: {
+    input: "./templates/main.css",
+    output: "./_build/output.css",
+    tailwindConfig: "./tailwind.config.js",
+  },
+});
+
+engine.mount();
+Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
+
+`engine.app` is a standard [Hono](https://hono.dev) app. Add middleware, auth, custom routes — anything Hono supports — before calling `engine.mount()`.

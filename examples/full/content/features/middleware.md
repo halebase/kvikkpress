@@ -21,7 +21,7 @@ engine.app.use("/*", async (c, next) => {
 });
 
 engine.mount();  // KvikkPress routes registered after middleware
-Deno.serve({ port: 3000 }, engine.app.fetch);
+Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
 
 ## Custom routes

@@ -42,7 +42,7 @@ cd my-docs
 deno task dev
 ```
 
-Open `http://localhost:3000`. Edit `content/index.md`, refresh.
+Open `http://localhost:3600`. Edit `content/index.md`, refresh.
 
 ## How it works
 
@@ -119,7 +119,7 @@ engine.app.use("/*", async (c, next) => {
 engine.app.get("/api/search", searchHandler);
 
 engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
+Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
 
 ### LLM session tokens
@@ -189,13 +189,13 @@ The server exposes a single tool, `query_docs_{id}` (e.g. `query_docs_my_project
 
 ```sh
 # Initialize
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3600/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
 
 # Search docs
-curl -X POST http://localhost:3000/mcp \
+curl -X POST http://localhost:3600/mcp \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query_docs_my_project","arguments":{"query":"authentication","topic":"/guides"}}}'
@@ -225,7 +225,7 @@ import * as site from "./_build/site.ts";
 
 const engine = createKvikkPress({ site: { title: "My Docs" }, ...site });
 engine.mount();
-Deno.serve({ port: 3000 }, engine.app.fetch);
+Deno.serve({ port: 3600 }, engine.app.fetch);
 ```
 
 Not ideal yet, can be improved later. Works well for now.
