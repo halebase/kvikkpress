@@ -29,7 +29,7 @@ Then you need auth. Maybe session-gated pages or feature flags. You want LLM age
 
 All you wanted was getting pure markdown with a session check live.
 
-KvikkPress stays in the simple lane. A folder of markdown files, a `fetch` handler, and whatever backend logic you wire up yourself.
+KvikkPress stays in the simple lane. A folder of markdown files, a `fetch` handler, and whatever backend logic you wire up yourself. It's fast, stateless, and implements clean HTTP caching so your public docs play well with CDNs out of the box.
 
 ## Quick start
 
