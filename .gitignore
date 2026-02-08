@@ -1,2 +1,5 @@
 .rig/
 _build/
+_dev/
+node_modules
+.DS_Store

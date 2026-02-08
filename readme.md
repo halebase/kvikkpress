@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="https://raw.githubusercontent.com/halebase/kvikkpress/main/assets/kvikkpress.png" width="600"/>
+</div>
+
 # KvikkPress
 
 A simple documentation server. Markdown files in, docs site out.
@@ -21,12 +25,12 @@ KvikkPress stays in the simple lane. A folder of markdown files, a `fetch` handl
 
 ## Quick start
 
-KvikkPress runs on [Deno](https://docs.deno.com/runtime/). Copy the starter, add content, run:
+KvikkPress runs on [Deno](https://docs.deno.com/runtime/). Create a project and start the dev server:
 
 ```sh
-cp -r examples/start my-docs
+deno run -A --reload https://raw.githubusercontent.com/halebase/kvikkpress/main/init.ts my-docs
 cd my-docs
-deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env server.ts
+deno task dev
 ```
 
 Open `http://localhost:3000`. Edit `content/index.md`, refresh.
@@ -172,3 +176,7 @@ node_modules/
 ---
 
 *Named after eating one too many Kvikk Lunsjes while XC-skiing in Norway.*
+
+These are docs — don't take them too seriously.
+
+Generated with some LLM assistance.
