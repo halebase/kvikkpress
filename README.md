@@ -220,7 +220,7 @@ Passed as `llm` in `dev()`, `build()`, and `createKvikkPress()`.
 | Field | Type | Description |
 |---|---|---|
 | `hmacKey` | `CryptoKey` | HMAC-SHA256 key for signing and verifying tokens |
-| `groups` | `{ prefix: string }[][]` | Permission groups. Each group is an array of route prefixes. Max 8 groups, 24 entries each. Position-sensitive — don't reorder after issuing tokens |
+| `groups` | `{ prefix: string }[][]` | Permission groups. Each group is an array of route prefixes. Max 8 groups (1 byte bitmask), max 24 entries per group (3 byte bitmask). Position-sensitive — don't reorder after issuing tokens |
 | `expiresInHours` | `number` | Optional. Token lifetime in hours. Default: `8` |
 | `isAuthenticated` | `(c: Context) => boolean \| Promise<boolean>` | Optional. Primary auth check (e.g. browser session). If true, serves without requiring LLM token |
 

@@ -78,6 +78,10 @@ Same applies to `pages` and `markdown` objects — use `delete` + assign, never 
 const absoluteContentDir = Deno.realPathSync(contentDir);
 ```
 
+### Watcher: Content Index Must Rebuild on Modify
+
+On macOS, `Deno.watchFs` debounces create+modify into just modify events. The watcher's modify path must call `cache.rebuildIndex()` after updating pages — otherwise the sidebar (which derives from `contentIndex`) won't reflect new/renamed pages. The `rebuildIndex()` method exists separately from `rebuild()` so modify events can update the index without recompiling all pages.
+
 ### CSS Build Artifacts
 
 All build artifacts go to `_build/`, including Tailwind CSS output. The dev server maps `/static/output.css` → `_build/output.css` via an explicit route. Never put generated CSS in `static/`.
@@ -95,7 +99,7 @@ fileHashes["/static/output.css"] = await hashFile(config.css.output); // CSS art
 
 When `llm` config is provided, KvikkPress gates `.md` endpoints with stateless HMAC-signed tokens:
 
-1. `LlmConfig` (consumer-facing): `hmacKey` (CryptoKey — consumer imports it), `groups` (route prefix permissions), `isAuthenticated` callback
+1. `LlmConfig` (consumer-facing): `hmacKey` (CryptoKey — consumer imports it), `groups` (route prefix permissions), `isAuthenticated` callback, `expiresInHours` (default: 8)
 2. `initLlmRuntime()` validates config, stores CryptoKey → `LlmTokenRuntime` (internal, fully sync)
 3. `.md` request flow: `isAuthenticated` callback → `?llm=` param → `llm_s` cookie → 401 markdown
 4. `POST /api/llm-token` generates tokens (gated by `isAuthenticated`)
@@ -141,10 +145,39 @@ rig up                 # Starts all services: site, start example, full example
 rig up start           # Start only the start example
 ```
 
-### Examples
+### Examples and Workspace
+
+Examples are Deno workspace members (configured in root `deno.json` `"workspace"`). They import the package via jsr import maps with caret semver:
+
+```json
+{
+  "imports": {
+    "@halebase/kvikkpress/dev": "jsr:@halebase/kvikkpress@^0.1.3/dev",
+    "@halebase/kvikkpress/build": "jsr:@halebase/kvikkpress@^0.1.3/build"
+  }
+}
+```
+
+**Workspace linking**: The root `deno.json` version must satisfy the caret range in examples' import maps (e.g., `0.1.99` satisfies `^0.1.3`). This makes the workspace resolve imports to local code during development. If the version doesn't match, Deno downloads from jsr instead of linking locally.
+
+**`"lock": false`**: Examples have `"lock": false` in their own `deno.json` for standalone use (prevents lockfile pinning old versions). This produces a harmless warning during workspace development (`"lock" field can only be specified in the workspace root`). The root also has `"lock": false`.
+
+**jsr import maps**: The trailing-slash pattern (`"@scope/pkg/": "jsr:@scope/pkg@version/"`) does NOT work for `jsr:` specifiers — Deno can't URL-parse them. Always use explicit entries per subpath export.
+
+**Caret semver**: `^0.1.x` auto-resolves minor bumps within `>=0.1.x <0.2.0`. No need for CI to update example versions after each release.
 
 - **examples/start/** — minimal copy-paste starter. `server.ts` has commented-out middleware example (`src/middleware.ts`) that users uncomment to activate.
-- **examples/full/** — comprehensive reference showcasing every feature (sidebar, TOC, dual-serve, templates, CSS theming, middleware).
+- **examples/full/** — comprehensive reference showcasing every feature including commented-out LLM gated content config.
+
+### Init Script
+
+`init.ts` fetches all files from `examples/start/` on GitHub and writes them to a target directory. **It must be a pure copy — no transformations, no logic beyond fetch-and-write.** Any config differences between examples (workspace members) and standalone projects must be handled by keeping examples valid for both contexts.
+
+Run with `--reload=https://raw.githubusercontent.com/halebase/kvikkpress` to bust Deno's module cache.
+
+### Publishing
+
+The publish workflow (`.github/workflows/publish.yml`) injects the version from the git tag into `deno.json` before publishing to jsr. The sed pattern matches any version string, not a specific placeholder. No post-publish steps needed — caret semver in examples handles version resolution.
 
 ### When Modifying Public API
 
@@ -155,7 +188,15 @@ The three barrel files (`mod.ts`, `build.ts`, `dev.ts`) re-export from `src/`. W
 
 ### Testing
 
-Consumer code (`docs/`) imports `kvikkpress/mod.ts`, `kvikkpress/build.ts`, `kvikkpress/dev.ts`. After changes, verify:
+```sh
+deno test src/                              # Unit tests
+deno check examples/start/server.ts         # Workspace start example
+deno check examples/start/build.ts
+deno check examples/full/server.ts          # Workspace full example
+deno check examples/full/build.ts
+```
+
+Consumer code (`docs/`) imports `kvikkpress/mod.ts`, `kvikkpress/build.ts`, `kvikkpress/dev.ts`. After changes, also verify:
 
 ```sh
 deno check docs/src/server.ts    # Runtime consumer
