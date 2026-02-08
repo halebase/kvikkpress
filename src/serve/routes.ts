@@ -1,11 +1,16 @@
 import { Hono } from "jsr:@hono/hono@^4.10.4";
-import { serveStatic } from "jsr:@hono/hono@^4.10.4/deno";
 import { logger } from "jsr:@hono/hono@^4.10.4/logger";
-import nunjucks from "npm:nunjucks@^3.2.4";
-import type { ContentCache } from "../content/cache.ts";
+import type nunjucks from "npm:nunjucks@^3.2.4";
+import type { ContentNode, CachedPage } from "../content/types.ts";
+
+/** Mutable content data — routes read from this on every request. */
+export interface ContentData {
+  contentIndex: ContentNode[];
+  pages: Record<string, CachedPage>;
+  markdown: Record<string, string>;
+}
 
 export interface RouteConfig {
-  staticDir: string;
   siteTitle: string;
   templateGlobals?: Record<string, unknown>;
   fileHashes: Record<string, string>;
@@ -14,63 +19,42 @@ export interface RouteConfig {
 
 export function registerRoutes(
   app: Hono,
-  cache: ContentCache,
-  config: RouteConfig
+  nunjucksEnv: nunjucks.Environment,
+  content: ContentData,
+  config: RouteConfig,
 ): void {
   app.use("*", logger());
 
-  // Static file serving — JS gets no-cache, images get 4h cache
-  app.use("/static/*.js", async (c, next) => {
-    await next();
-    c.res.headers.set("cache-control", "no-store, no-cache, must-revalidate");
-  });
-
-  app.use("/static/*", async (c, next) => {
-    await next();
-    if (c.res.headers.get("content-type")?.startsWith("image/")) {
-      c.res.headers.set("cache-control", "public, max-age=14400");
-    }
-  });
-
-  app.use(
-    "/static/*",
-    serveStatic({
-      root: "./",
-      rewriteRequestPath: (path) => path,
-    })
-  );
-
   // Dual-serve catch-all: .md → raw markdown, otherwise → HTML
-  app.get("/*", async (c) => {
+  app.get("/*", (c) => {
     const pathname = c.req.path;
 
-    // Serve raw markdown
+    // Serve raw markdown from pre-built data
     if (pathname.endsWith(".md")) {
       const pathWithoutMd = pathname.slice(0, -3);
-      const filePath = await cache.findFile(pathWithoutMd);
-      if (!filePath) {
+      const md = content.markdown[pathWithoutMd];
+      if (!md) {
         return c.text(`Not found: ${pathname}`, 404);
       }
-      const md = await Deno.readTextFile(filePath);
       c.res.headers.set(
         "cache-control",
-        "no-store, no-cache, must-revalidate"
+        "no-store, no-cache, must-revalidate",
       );
       return c.text(md, 200, {
         "content-type": "text/markdown; charset=utf-8",
       });
     }
 
-    // Serve HTML
-    const cached = cache.pageCache.get(pathname);
+    // Serve HTML from pre-built page cache
+    const cached = content.pages[pathname];
     if (!cached) {
       return c.text(`Not found: ${pathname}`, 404);
     }
 
-    const html = nunjucks.render("layout.html", {
+    const html = nunjucksEnv.render("layout.html", {
       title: cached.meta.title || "Documentation",
       siteTitle: config.siteTitle,
-      contentTree: cache.contentIndex,
+      contentTree: content.contentIndex,
       currentPath: pathname,
       content: cached.html,
       toc: cached.toc,

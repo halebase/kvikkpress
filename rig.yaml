@@ -1,9 +1,13 @@
+# https://github.com/roelentless/rig
 groups:
   kvikkpress:
     services:
       site:
         command: deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env --watch server.ts
         working_dir: ./site
-      example:
+      start:
         command: deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env --watch server.ts
-        working_dir: ./example
+        working_dir: ./examples/start
+      full:
+        command: deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env --watch server.ts
+        working_dir: ./examples/full

@@ -7,7 +7,8 @@ export class ContentCache {
   private contentDir: string;
   private markdownConfig?: MarkdownConfig;
   private _contentIndex: ContentNode[] = [];
-  private _pageCache = new Map<string, CachedPage>();
+  private _pageCache: Record<string, CachedPage> = {};
+  private _markdown: Record<string, string> = {};
 
   constructor(contentDir: string, markdownConfig?: MarkdownConfig) {
     this.contentDir = contentDir;
@@ -18,25 +19,77 @@ export class ContentCache {
     return this._contentIndex;
   }
 
-  get pageCache(): Map<string, CachedPage> {
+  get pageCache(): Record<string, CachedPage> {
     return this._pageCache;
   }
 
+  get markdown(): Record<string, string> {
+    return this._markdown;
+  }
+
+  /** Full build: discover all content, compile all pages. */
   async build(): Promise<void> {
     console.log("Building content index...");
-    this._contentIndex = await buildContentIndex(this.contentDir);
+    const nodes = await buildContentIndex(this.contentDir);
+    this._contentIndex.length = 0;
+    this._contentIndex.push(...nodes);
     console.log(`Found ${this._contentIndex.length} top-level items`);
-    await this.buildPageCache();
+    await this.buildAllPages();
   }
 
+  /** Full rebuild: re-discover and re-compile everything. */
   async rebuild(): Promise<void> {
-    this._contentIndex = await buildContentIndex(this.contentDir);
-    await this.buildPageCache();
+    const nodes = await buildContentIndex(this.contentDir);
+    this._contentIndex.length = 0;
+    this._contentIndex.push(...nodes);
+    await this.buildAllPages();
   }
 
-  private async buildPageCache(): Promise<void> {
+  /** Incremental: re-compile a single page. */
+  async updatePage(pathname: string): Promise<void> {
+    const filePath = await this.findFile(pathname);
+    if (!filePath) {
+      console.error(`  x ${pathname}: File not found`);
+      return;
+    }
+
+    const raw = await Deno.readTextFile(filePath);
+    this._markdown[pathname] = raw;
+
+    const { meta, markdown } = parseFrontmatter(raw);
+    const html = await renderMarkdown(markdown, this.markdownConfig);
+    const toc = extractToc(html);
+
+    this._pageCache[pathname] = { html, toc, meta };
+    console.log(`  ok ${pathname} (updated)`);
+  }
+
+  /** Incremental: remove a page from cache. */
+  removePage(pathname: string): void {
+    delete this._pageCache[pathname];
+    delete this._markdown[pathname];
+    console.log(`  ok ${pathname} (removed)`);
+  }
+
+  async findFile(pathname: string): Promise<string | null> {
+    const path = pathname.replace(/^\//, "");
+    const base = path
+      ? `${this.contentDir}/${path}`
+      : this.contentDir;
+
+    if (await exists(`${base}/index.md`)) return `${base}/index.md`;
+    if (await exists(`${base}.md`)) return `${base}.md`;
+
+    return null;
+  }
+
+  private async buildAllPages(): Promise<void> {
     console.log("\nBuilding page cache...");
     const allFiles = flattenForSidebar(this._contentIndex);
+
+    // Clear caches
+    for (const key of Object.keys(this._pageCache)) delete this._pageCache[key];
+    for (const key of Object.keys(this._markdown)) delete this._markdown[key];
 
     let successCount = 0;
     let errorCount = 0;
@@ -50,12 +103,14 @@ export class ContentCache {
           continue;
         }
 
-        const md = await Deno.readTextFile(filePath);
-        const { meta, markdown } = parseFrontmatter(md);
+        const raw = await Deno.readTextFile(filePath);
+        this._markdown[file.path] = raw;
+
+        const { meta, markdown } = parseFrontmatter(raw);
         const htmlBody = await renderMarkdown(markdown, this.markdownConfig);
         const toc = extractToc(htmlBody);
 
-        this._pageCache.set(file.path, { html: htmlBody, toc, meta });
+        this._pageCache[file.path] = { html: htmlBody, toc, meta };
         console.log(`  ok ${file.path}`);
         successCount++;
       } catch (error) {
@@ -66,24 +121,12 @@ export class ContentCache {
     }
 
     console.log(
-      `\nPage cache built: ${successCount} pages compiled, ${errorCount} errors\n`
+      `\nPage cache built: ${successCount} pages compiled, ${errorCount} errors\n`,
     );
 
     if (errorCount > 0) {
       throw new Error(`Failed to compile ${errorCount} page(s)`);
     }
-  }
-
-  async findFile(pathname: string): Promise<string | null> {
-    const path = pathname.replace(/^\//, "");
-    const base = path
-      ? `${this.contentDir}/${path}`
-      : this.contentDir;
-
-    if (await exists(`${base}/index.md`)) return `${base}/index.md`;
-    if (await exists(`${base}.md`)) return `${base}.md`;
-
-    return null;
   }
 }
 

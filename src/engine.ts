@@ -1,132 +1,113 @@
 import { Hono } from "jsr:@hono/hono@^4.10.4";
-import nunjucks from "npm:nunjucks@^3.2.4";
-import { ContentCache } from "./content/cache.ts";
-import { registerRoutes } from "./serve/routes.ts";
-import { buildFileHashes } from "./serve/assets.ts";
-import { startContentWatcher } from "./dev/watcher.ts";
-import { buildCss, watchCss, type CssConfig } from "./dev/css.ts";
-import type { MarkdownConfig } from "./content/render.ts";
-import type { ContentNode } from "./content/types.ts";
+import type nunjucks from "npm:nunjucks@^3.2.4";
+import { registerRoutes, type ContentData } from "./serve/routes.ts";
+import { createBundledEnv } from "./serve/templates.ts";
+import type { ContentNode, CachedPage } from "./content/types.ts";
 
 export interface KvikkPressConfig {
-  /** Path to content directory (markdown files) */
-  content: string;
-
   /** Site metadata */
   site: {
     title: string;
     description?: string;
   };
 
-  /** Theme configuration */
-  theme: {
-    /** Directory containing nunjucks templates. Must have layout.html. */
-    templates: string;
-    /** Directory for static assets (served at /static/*) */
-    static: string;
-    /** CSS build config. */
-    css?: CssConfig;
-    /** Files to hash for cache busting (relative to static dir) */
-    hashFiles?: string[];
-  };
+  /** Pre-built content index (from build output) */
+  contentIndex: ContentNode[];
 
-  /** Markdown pipeline configuration */
-  markdown?: MarkdownConfig;
+  /** Pre-built page cache (from build output) */
+  pages: Record<string, CachedPage>;
+
+  /** Pre-built raw markdown for .md endpoint (from build output) */
+  markdown: Record<string, string>;
+
+  /** Pre-built template strings (from build output) */
+  templates: Record<string, string>;
+
+  /** Pre-built file hashes for cache busting (from build output) */
+  fileHashes: Record<string, string>;
 
   /** Extra variables passed to every template render */
   templateGlobals?: Record<string, unknown>;
 
   /** Version string shown in templates. Defaults to "dev". */
   version?: string;
-
-  /** Disable template caching (for development). Defaults to false. */
-  noTemplateCache?: boolean;
 }
 
 export interface KvikkPress {
-  /** The Hono app — add middleware and routes to this before calling start(). */
+  /** The Hono app — add middleware and routes before calling mount(). */
   app: Hono;
 
-  /** Compile assets (CSS). Run once at build time (e.g. in Dockerfile). */
-  build(): Promise<void>;
+  /** Register KvikkPress routes. Call after adding consumer middleware. */
+  mount(): void;
 
-  /** Build content cache, hash assets, register routes. Call at server startup. */
-  start(): Promise<void>;
-
-  /** Rebuild content index and page cache (e.g. after content changes). */
-  rebuild(): Promise<void>;
-
-  /** Start content + CSS watchers for dev mode. Calls build() + start() first. */
-  startDev(): Promise<void>;
+  /** Render a template with data. Uses bundled templates (prod) or filesystem (dev). */
+  render(template: string, data: Record<string, unknown>): string;
 
   /** The current content tree. */
   get contentIndex(): ContentNode[];
 
-  /** Shorthand for app.fetch — pass to Deno.serve(). */
-  fetch: (request: Request, info?: Deno.ServeHandlerInfo) => Response | Promise<Response>;
+  /** Shorthand for app.fetch — pass to Deno.serve() or export default. */
+  // deno-lint-ignore no-explicit-any
+  fetch: (request: Request, ...args: any[]) => Response | Promise<Response>;
 }
 
+/**
+ * Create a KvikkPress engine from pre-built content.
+ * The engine is runtime-only — no filesystem access, no Deno APIs.
+ * Use `build()` from `@halebase/kvikkpress/build` to generate the build output.
+ */
 export function createKvikkPress(config: KvikkPressConfig): KvikkPress {
   const app = new Hono();
-  const cache = new ContentCache(config.content, config.markdown);
-  let routesRegistered = false;
+  const nunjucksEnv = createBundledEnv(config.templates);
 
-  // Configure nunjucks
-  nunjucks.configure(config.theme.templates, {
-    autoescape: true,
-    throwOnUndefined: false,
-    noCache: config.noTemplateCache ?? false,
-  });
+  return createEngine(app, nunjucksEnv, config);
+}
+
+/**
+ * Internal: create a KvikkPress engine from an existing Hono app and nunjucks env.
+ * Used by both the production `createKvikkPress()` and the dev `dev()` function.
+ */
+export function createEngine(
+  app: Hono,
+  nunjucksEnv: nunjucks.Environment,
+  config: {
+    site: { title: string; description?: string };
+    contentIndex: ContentNode[];
+    pages: Record<string, CachedPage>;
+    markdown: Record<string, string>;
+    fileHashes: Record<string, string>;
+    templateGlobals?: Record<string, unknown>;
+    version?: string;
+  },
+): KvikkPress {
+  let mounted = false;
+
+  const content: ContentData = {
+    contentIndex: config.contentIndex,
+    pages: config.pages,
+    markdown: config.markdown,
+  };
 
   const engine: KvikkPress = {
     app,
 
-    async build() {
-      if (config.theme.css) {
-        console.log("Building CSS...");
-        await buildCss(config.theme.css);
-      }
+    mount() {
+      if (mounted) return;
+      registerRoutes(app, nunjucksEnv, content, {
+        siteTitle: config.site.title,
+        templateGlobals: config.templateGlobals,
+        fileHashes: config.fileHashes,
+        version: config.version || "dev",
+      });
+      mounted = true;
     },
 
-    async start() {
-      // Hash static files for cache busting
-      const filesToHash = config.theme.hashFiles || ["output.css", "main.js"];
-      const fileHashes = await buildFileHashes(
-        config.theme.static,
-        filesToHash
-      );
-
-      // Build content index + page cache
-      await cache.build();
-
-      // Register engine routes (after consumer has added their middleware/routes)
-      if (!routesRegistered) {
-        registerRoutes(app, cache, {
-          staticDir: config.theme.static,
-          siteTitle: config.site.title,
-          templateGlobals: config.templateGlobals,
-          fileHashes,
-          version: config.version || "dev",
-        });
-        routesRegistered = true;
-      }
-    },
-
-    async rebuild() {
-      await cache.rebuild();
-    },
-
-    async startDev() {
-      await engine.build();
-      await engine.start();
-      startContentWatcher(config.content, cache);
-      if (config.theme.css) {
-        watchCss(config.theme.css);
-      }
+    render(template: string, data: Record<string, unknown>): string {
+      return nunjucksEnv.render(template, data);
     },
 
     get contentIndex() {
-      return cache.contentIndex;
+      return content.contentIndex;
     },
 
     fetch: app.fetch,

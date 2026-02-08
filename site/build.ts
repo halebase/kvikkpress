@@ -1,18 +1,13 @@
-import { createKvikkPress } from "../mod.ts";
+import { build } from "../build.ts";
 
-const engine = createKvikkPress({
+await build({
   content: "./content",
-  site: { title: "KvikkPress" },
-  theme: {
-    templates: "./templates",
-    static: "./static",
-    css: {
-      input: "./templates/main.css",
-      output: "./static/output.css",
-      tailwindConfig: "./tailwind.config.js",
-    },
+  templates: "./templates",
+  static: "./static",
+  css: {
+    input: "./templates/main.css",
+    output: "./_build/output.css",
+    tailwindConfig: "./tailwind.config.js",
   },
+  outDir: "./_build",
 });
-
-await engine.build();
-console.log("Build complete");

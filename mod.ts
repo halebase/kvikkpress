@@ -10,3 +10,5 @@ export type {
   TocItem,
   CachedPage,
 } from "./src/content/types.ts";
+export type { BuildConfig } from "./src/build/mod.ts";
+export type { DevConfig } from "./src/dev/mod.ts";

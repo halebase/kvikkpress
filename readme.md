@@ -2,17 +2,18 @@
 
 A simple documentation server. Markdown files in, docs site out.
 
-A Deno server that pre-renders markdown at startup and serves from cache. No client-side framework. No build graph. Add Hono middleware for auth, sessions, or custom routes.
+Build-first: compiles markdown, templates, and assets into a single module at deploy time. Runtime serves from memory — no filesystem access, works on Deno, Cloudflare Workers, or any WinterTC-compatible platform.
 
 ```
-content/*.md ──→ KvikkPress (Deno) ──→ /page      HTML for browsers
-                                  ──→ /page.md   raw markdown for agents
-                                  ──→ /static/*  hashed assets
+build time:   content/*.md + templates/ ──→ _build/site.ts
+runtime:      site.ts ──→ fetch(Request) ──→ /page      HTML for browsers
+                                          ──→ /page.md   raw markdown for agents
+                                          ──→ /static/*  hashed assets
 ```
 
 ## Why
 
-What happens when you "just" need to render markdown docs conditionally based on session? Static site generators can't do server-side auth, and every page still needs to be crawlable as clean markdown. KvikkPress needs a folder of markdown files and a Deno server.
+What happens when you "just" need to render markdown docs conditionally based on session? Static site generators can't do server-side auth, and every page still needs to be crawlable as clean markdown. KvikkPress needs a folder of markdown files and a fetch handler.
 
 When you need backend logic — auth, sessions, custom API routes — it's standard Hono middleware. Not a framework-specific escape hatch.
 
@@ -20,32 +21,70 @@ When you need backend logic — auth, sessions, custom API routes — it's stand
 
 KvikkPress runs on [Deno](https://docs.deno.com/runtime/).
 
-```ts
-import { createKvikkPress } from "kvikkpress";
+**1. Build** — compile content + CSS + templates into a module:
 
-const docs = createKvikkPress({
+```ts title="build.ts"
+import { build } from "@halebase/kvikkpress/build";
+
+await build({
+  content: "./content",
+  templates: "./templates",
+  static: "./static",
+  css: {
+    input: "./templates/main.css",
+    output: "./_build/output.css",
+    tailwindConfig: "./tailwind.config.js",
+  },
+  outDir: "./_build",
+});
+```
+
+**2. Serve** — create a runtime engine from the build output:
+
+```ts title="server.ts"
+import { createKvikkPress } from "@halebase/kvikkpress";
+import * as site from "./_build/site.ts";
+
+const engine = createKvikkPress({
+  site: { title: "My Docs" },
+  ...site,
+});
+
+engine.mount();
+Deno.serve({ port: 3000 }, engine.app.fetch);
+```
+
+**3. Dev** — live reload without a build step:
+
+```ts title="dev.ts"
+import { dev } from "@halebase/kvikkpress/dev";
+
+const engine = await dev({
   content: "./content",
   site: { title: "My Docs" },
-  theme: {
-    templates: "./templates",
-    static: "./static",
+  templates: "./templates",
+  static: "./static",
+  css: {
+    input: "./templates/main.css",
+    output: "./_build/output.css",
+    tailwindConfig: "./tailwind.config.js",
   },
 });
 
-await docs.start();
-Deno.serve({ port: 3000 }, docs.app.fetch);
+engine.mount();
+Deno.serve({ port: 3000 }, engine.app.fetch);
 ```
 
 Put markdown files in `content/`, a `layout.html` template in `templates/`, done.
 
 ## How it works
 
-All pages are pre-rendered at startup into an in-memory cache. Requests hit the cache, not the filesystem. This gives you static-site throughput with a running server behind it.
+Content is compiled at build time into a TypeScript module (`_build/site.ts`). At runtime, the engine serves everything from memory — no filesystem access needed.
 
 ```
-build()      Compile CSS. Run once at Docker build time.
-start()      Pre-render content, hash assets, register routes. Run at server startup.
-startDev()   build() + start() + file watchers for content and CSS.
+build()              Compile CSS + content + templates → _build/site.ts. Run at deploy time.
+createKvikkPress()   Create runtime engine from pre-built data. Filesystem-free.
+dev()                Build in-memory + file watchers for content and CSS. Dev only.
 ```
 
 ## Content
@@ -76,58 +115,64 @@ Kebab-case folder names auto-convert to title case in the sidebar.
 
 ## Backend logic
 
-KvikkPress exposes a Hono app. Add middleware and routes before calling `start()`:
+KvikkPress exposes a Hono app. Add middleware and routes before calling `mount()`:
 
 ```ts
-const docs = createKvikkPress({ ... });
+const engine = createKvikkPress({ ... });
 
 // Auth: protect HTML, leave markdown open for agents
-docs.app.use("/*", async (c, next) => {
+engine.app.use("/*", async (c, next) => {
   if (c.req.path.endsWith(".md")) return next();
   if (!isAuthenticated(c)) return c.redirect("/login");
   return next();
 });
 
 // Custom routes alongside docs
-docs.app.get("/api/search", searchHandler);
+engine.app.get("/api/search", searchHandler);
 
-await docs.start();
-Deno.serve({ port: 3000 }, docs.app.fetch);
+engine.mount();
+Deno.serve({ port: 3000 }, engine.app.fetch);
 ```
 
 ## Configuration
 
+**Build config** (passed to `build()` and `dev()`):
+
 ```ts
-createKvikkPress({
-  content: "./content",
-
-  site: {
-    title: "My Docs",
-    description: "Optional",
+{
+  content: "./content",           // Markdown content directory
+  templates: "./templates",       // Nunjucks templates. Must have layout.html.
+  static: "./static",             // Static assets, served at /static/*
+  css: {                          // Optional. Tailwind CSS build.
+    input: "./templates/main.css",
+    output: "./_build/output.css",
+    tailwindConfig: "./tailwind.config.js",
   },
-
-  theme: {
-    templates: "./templates",     // Nunjucks templates. Must have layout.html.
-    static: "./static",           // Served at /static/*
-    css: {                        // Optional. Tailwind CSS build.
-      input: "./templates/main.css",
-      output: "./static/output.css",
-      tailwindConfig: "./tailwind.config.js",
-    },
-    hashFiles: ["output.css", "main.js"],
-  },
-
   markdown: {                     // All optional
     remarkPlugins: [],
     rehypePlugins: [],
     shiki: { theme: "github-dark" },
   },
+  outDir: "./_build",             // Build output directory (build() only)
+}
+```
 
+**Runtime config** (passed to `createKvikkPress()`):
+
+```ts
+{
+  site: { title: "My Docs", description: "Optional" },
+  contentIndex,                   // From build output
+  pages,                          // From build output
+  markdown,                       // From build output
+  templates,                      // From build output
+  fileHashes,                     // From build output
   templateGlobals: { ... },       // Extra variables in every template render
   version: "1.0.0",              // Defaults to "dev"
-  noTemplateCache: false,         // Set true for dev
-});
+}
 ```
+
+In practice, spread the build output: `createKvikkPress({ site: {...}, ...site })`.
 
 ## Template data
 
@@ -155,10 +200,10 @@ Extend with `remarkPlugins` and `rehypePlugins` — appended to the defaults.
 
 ## CSS
 
-When `theme.css` is configured, KvikkPress manages Tailwind:
+When `css` is configured, KvikkPress manages Tailwind. CSS compiles to `_build/output.css` alongside other artifacts. The dev server maps it to `/static/output.css` automatically.
 
 - `build()` runs `@tailwindcss/cli --minify`
-- `startDev()` runs `@tailwindcss/cli --watch`
+- `dev()` runs `@tailwindcss/cli --watch`
 
 ```css
 @import "tailwindcss";
@@ -168,16 +213,25 @@ When `theme.css` is configured, KvikkPress manages Tailwind:
 }
 ```
 
-No separate build step needed.
-
 ## Docker
 
 ```dockerfile
-RUN deno run ... build.ts          # CSS compilation (build time)
-CMD ["deno", "run", ... "server.ts"]  # Content rendering (startup)
+RUN deno run ... build.ts          # Compile CSS + content + templates (build time)
+CMD ["deno", "run", ... "server.ts"]  # Serve from memory (runtime)
 ```
 
-`build()` and `start()` are separate so assets compile once at image build time.
+`build()` compiles everything at image build time. The runtime imports `_build/site.ts` and serves from memory.
+
+## .gitignore
+
+Add these generated files to `.gitignore`:
+
+```
+_build/
+node_modules/
+```
+
+`_build/` contains all build artifacts: `site.ts` (compiled content/templates/hashes) and `output.css` (compiled Tailwind CSS). `node_modules/` is created by Deno's `--node-modules-dir` flag.
 
 ---
 

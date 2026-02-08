@@ -1,8 +1,7 @@
-import { dev } from "../dev.ts";
+import { build } from "../../build.ts";
 
-const engine = await dev({
+await build({
   content: "./content",
-  site: { title: "KvikkPress" },
   templates: "./templates",
   static: "./static",
   css: {
@@ -10,7 +9,5 @@ const engine = await dev({
     output: "./_build/output.css",
     tailwindConfig: "./tailwind.config.js",
   },
+  outDir: "./_build",
 });
-
-engine.mount();
-Deno.serve({ port: 3001 }, engine.app.fetch);
