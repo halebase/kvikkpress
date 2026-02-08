@@ -48,7 +48,7 @@ export function startContentWatcher(
       debounceTimer = setTimeout(async () => {
         try {
           if (e.kind === "modify") {
-            // Incremental: only re-compile changed pages
+            // Incremental: re-compile changed pages, rebuild sidebar
             for (const path of mdPaths) {
               const pagePath = filePathToPagePath(absoluteContentDir, path);
               if (pagePath) {
@@ -56,8 +56,9 @@ export function startContentWatcher(
                 await cache.updatePage(pagePath);
               }
             }
+            await cache.rebuildIndex();
           } else {
-            // Create/remove: rebuild content tree + recompile all
+            // Create/remove: rebuild everything
             console.log("\nRebuilding content index...");
             await cache.rebuild();
           }

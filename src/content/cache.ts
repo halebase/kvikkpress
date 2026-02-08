@@ -37,11 +37,16 @@ export class ContentCache {
     await this.buildAllPages();
   }
 
-  /** Full rebuild: re-discover and re-compile everything. */
-  async rebuild(): Promise<void> {
+  /** Rebuild just the content index (sidebar tree) from disk. */
+  async rebuildIndex(): Promise<void> {
     const nodes = await buildContentIndex(this.contentDir);
     this._contentIndex.length = 0;
     this._contentIndex.push(...nodes);
+  }
+
+  /** Full rebuild: re-discover and re-compile everything. */
+  async rebuild(): Promise<void> {
+    await this.rebuildIndex();
     await this.buildAllPages();
   }
 
