@@ -1,8 +1,8 @@
 {
   "lock": false,
   "imports": {
-    "@halebase/kvikkpress/dev": "jsr:@halebase/kvikkpress@^0.1.4/dev",
-    "@halebase/kvikkpress/build": "jsr:@halebase/kvikkpress@^0.1.4/build"
+    "@halebase/kvikkpress/dev": "jsr:@halebase/kvikkpress@^0.2.0/dev",
+    "@halebase/kvikkpress/build": "jsr:@halebase/kvikkpress@^0.2.0/build"
   },
   "tasks": {
     "dev": "deno run --node-modules-dir --allow-net --allow-read --allow-write --allow-run --allow-env server.ts",

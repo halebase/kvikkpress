@@ -1,6 +1,6 @@
 {
   "name": "@halebase/kvikkpress",
-  "version": "0.1.99",
+  "version": "0.2.0",
   "license": "AGPL-3.0-only",
   "lock": false,
   "exports": {
@@ -8,7 +8,7 @@
     "./build": "./build.ts",
     "./dev": "./dev.ts"
   },
-  "workspace": ["./examples/start", "./examples/full"],
+  "workspace": ["./site", "./examples/start", "./examples/full"],
   "tasks": {
     "test": "deno test src/"
   }
