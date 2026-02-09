@@ -192,25 +192,24 @@ rig up start           # Start only the start example
 
 ### Examples and Workspace
 
-Examples are Deno workspace members (configured in root `deno.json` `"workspace"`). They import the package via jsr import maps with caret semver:
+Examples and `site/` are Deno workspace members (configured in root `deno.json` `"workspace"`). They import the package via jsr import maps with caret semver:
 
 ```json
 {
   "imports": {
-    "@halebase/kvikkpress/dev": "jsr:@halebase/kvikkpress@^0.1.3/dev",
-    "@halebase/kvikkpress/build": "jsr:@halebase/kvikkpress@^0.1.3/build"
+    "@halebase/kvikkpress/dev": "jsr:@halebase/kvikkpress@^0.2.0/dev",
+    "@halebase/kvikkpress/build": "jsr:@halebase/kvikkpress@^0.2.0/build"
   }
 }
 ```
 
-**Workspace linking**: The root `deno.json` version must satisfy the caret range in examples' import maps (e.g., `0.1.99` satisfies `^0.1.3`). This makes the workspace resolve imports to local code during development. If the version doesn't match, Deno downloads from jsr instead of linking locally.
+**Workspace linking**: The root `deno.json` version must satisfy the caret range in workspace members' import maps (e.g., `0.2.0` satisfies `^0.2.0`). This makes the workspace resolve imports to local code during development. If the version doesn't match, Deno downloads from jsr instead of linking locally. The publish workflow injects the git tag version before publishing.
 
-**`"lock": false`**: Examples have `"lock": false` in their own `deno.json` for standalone use (prevents lockfile pinning old versions). This produces a harmless warning during workspace development (`"lock" field can only be specified in the workspace root`). The root also has `"lock": false`.
+**`"lock": false`**: Workspace members have `"lock": false` in their own `deno.json` for standalone use (prevents lockfile pinning old versions). This produces a harmless warning during workspace development (`"lock" field can only be specified in the workspace root`). The root also has `"lock": false`.
 
 **jsr import maps**: The trailing-slash pattern (`"@scope/pkg/": "jsr:@scope/pkg@version/"`) does NOT work for `jsr:` specifiers — Deno can't URL-parse them. Always use explicit entries per subpath export.
 
-**Caret semver**: `^0.1.x` auto-resolves minor bumps within `>=0.1.x <0.2.0`. No need for CI to update example versions after each release.
-
+- **site/** — KvikkPress docs (dogfooding). Workspace member, same import pattern as examples.
 - **examples/start/** — minimal copy-paste starter. `server.ts` has commented-out middleware example (`src/middleware.ts`) and MCP config that users uncomment to activate.
 - **examples/full/** — comprehensive reference showcasing every feature including commented-out LLM gated content and MCP config.
 
