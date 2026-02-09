@@ -185,22 +185,6 @@ The `authenticate` hook is required — there is no unauthenticated mode. It rec
 
 The server exposes a single tool, `query_docs_{id}` (e.g. `query_docs_my_project`), which searches the in-memory markdown by keyword and returns matching pages filtered through `canAccess()`. The tool name is derived from the `id` field to avoid collisions when a client connects to multiple MCP servers.
 
-**Example MCP client request:**
-
-```sh
-# Initialize
-curl -X POST http://localhost:3600/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-
-# Search docs
-curl -X POST http://localhost:3600/mcp \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query_docs_my_project","arguments":{"query":"authentication","topic":"/guides"}}}'
-```
-
 ### Build and deploy
 
 `build` pre-renders all content to a single `site.ts` module. In production, import it and serve:
